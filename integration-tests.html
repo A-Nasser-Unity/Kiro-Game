@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Beat Survivors - Integration Tests</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #1a1a1a;
+            color: #fff;
+            padding: 20px;
+            margin: 0;
+        }
+        
+        .test-container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        h1 {
+            color: #00ff00;
+            border-bottom: 2px solid #00ff00;
+            padding-bottom: 10px;
+        }
+        
+        .controls {
+            margin-bottom: 20px;
+        }
+        
+        button {
+            background-color: #00ff00;
+            color: #000;
+            border: none;
+            padding: 10px 20px;
+            font-size: 14px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-right: 10px;
+        }
+        
+        button:hover {
+            background-color: #00cc00;
+        }
+        
+        button:disabled {
+            background-color: #666;
+            cursor: not-allowed;
+        }
+        
+        .test-output {
+            background-color: #0a0a0a;
+            border: 1px solid #333;
+            padding: 15px;
+            border-radius: 5px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            line-height: 1.6;
+            max-height: 700px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            margin-bottom: 20px;
+        }
+        
+        .test-pass {
+            color: #00ff00;
+        }
+        
+        .test-fail {
+            color: #ff0000;
+        }
+        
+        .test-info {
+            color: #ffff00;
+        }
+        
+        .summary {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: #0a0a0a;
+            border: 1px solid #333;
+            border-radius: 5px;
+        }
+        
+        .summary-pass {
+            color: #00ff00;
+        }
+        
+        .summary-fail {
+            color: #ff0000;
+        }
+        
+        .test-details {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: #0a0a0a;
+            border: 1px solid #333;
+            border-radius: 5px;
+        }
+        
+        .test-item {
+            margin-bottom: 10px;
+            padding: 10px;
+            background-color: #1a1a1a;
+            border-left: 3px solid #333;
+            border-radius: 3px;
+        }
+        
+        .test-item.passed {
+            border-left-color: #00ff00;
+        }
+        
+        .test-item.failed {
+            border-left-color: #ff0000;
+        }
+        
+        .test-item-name {
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        
+        .test-item-error {
+            color: #ff6666;
+            font-size: 11px;
+            margin-top: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <h1>Beat Survivors - Integration Tests</h1>
+        
+        <div class="controls">
+            <button onclick="runIntegrationTests()" id="runButton">Run Integration Tests</button>
+            <button onclick="clearOutput()" id="clearButton">Clear Output</button>
+        </div>
+        
+        <div class="test-output" id="testOutput">
+            Click "Run Integration Tests" to start the integration tests...
+        </div>
+        
+        <div class="summary" id="summary" style="display: none;">
+            <div id="summaryText"></div>
+        </div>
+        
+        <div class="test-details" id="testDetails" style="display: none;">
+            <h3>Test Details</h3>
+            <div id="detailsList"></div>
+        </div>
+    </div>
+
+    <!-- Load game classes -->
+    <script src="main.js"></script>
+    <!-- Load integration tests -->
+    <script src="integration-tests.js"></script>
+    
+    <script>
+        function runIntegrationTests() {
+            const output = document.getElementById('testOutput');
+            const summary = document.getElementById('summary');
+            const testDetails = document.getElementById('testDetails');
+            const runButton = document.getElementById('runButton');
+            
+            output.innerHTML = '';
+            summary.style.display = 'none';
+            testDetails.style.display = 'none';
+            runButton.disabled = true;
+            
+            // Capture console.log
+            const originalLog = console.log;
+            const logs = [];
+            
+            console.log = function(...args) {
+                logs.push(args.join(' '));
+                originalLog.apply(console, args);
+            };
+            
+            // Run tests
+            integrationRunner.run().then((results) => {
+                console.log = originalLog;
+                
+                // Display results
+                let html = '';
+                logs.forEach(log => {
+                    if (log.includes('✓')) {
+                        html += `<span class="test-pass">${escapeHtml(log)}</span>\n`;
+                    } else if (log.includes('✗')) {
+                        html += `<span class="test-fail">${escapeHtml(log)}</span>\n`;
+                    } else if (log.includes('===') || log.includes('Results') || log.includes('Passed') || log.includes('Failed')) {
+                        html += `<span class="test-info">${escapeHtml(log)}</span>\n`;
+                    } else {
+                        html += `${escapeHtml(log)}\n`;
+                    }
+                });
+                
+                output.innerHTML = html;
+                
+                // Display summary
+                const summaryDiv = document.getElementById('summary');
+                const summaryText = document.getElementById('summaryText');
+                
+                if (results.failed === 0) {
+                    summaryText.innerHTML = `<span class="summary-pass">✓ All ${results.total} tests passed!</span>`;
+                } else {
+                    summaryText.innerHTML = `<span class="summary-fail">✗ ${results.failed} of ${results.total} tests failed</span>`;
+                }
+                
+                summaryDiv.style.display = 'block';
+                
+                // Display test details
+                const detailsList = document.getElementById('detailsList');
+                let detailsHtml = '';
+                
+                results.results.forEach(result => {
+                    const statusClass = result.status === 'passed' ? 'passed' : 'failed';
+                    const statusIcon = result.status === 'passed' ? '✓' : '✗';
+                    
+                    detailsHtml += `
+                        <div class="test-item ${statusClass}">
+                            <div class="test-item-name">${statusIcon} ${escapeHtml(result.name)}</div>
+                            ${result.error ? `<div class="test-item-error">Error: ${escapeHtml(result.error)}</div>` : ''}
+                        </div>
+                    `;
+                });
+                
+                detailsList.innerHTML = detailsHtml;
+                testDetails.style.display = 'block';
+                
+                runButton.disabled = false;
+            });
+        }
+        
+        function clearOutput() {
+            document.getElementById('testOutput').innerHTML = '';
+            document.getElementById('summary').style.display = 'none';
+            document.getElementById('testDetails').style.display = 'none';
+        }
+        
+        function escapeHtml(text) {
+            const map = {
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                '"': '&quot;',
+                "'": '&#039;'
+            };
+            return text.replace(/[&<>"']/g, m => map[m]);
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Beat Survivors</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="game-container">
+        <div class="game-header">
+            <h1>Beat Survivors</h1>
+        </div>
+        
+        <div class="progress-bar-container">
+            <div class="progress-bar-label">Progress</div>
+            <div class="progress-bar-background">
+                <div class="progress-bar-fill" id="progressBar"></div>
+            </div>
+            <div class="progress-bar-percentage" id="progressPercentage">0%</div>
+        </div>
+
+        <canvas id="gameCanvas" width="1200" height="600"></canvas>
+
+        <div class="game-over-screen" id="gameOverScreen">
+            <div class="game-over-content">
+                <div class="game-over-message" id="gameOverMessage"></div>
+                <button class="restart-button" id="restartButton">Play Again</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="main.js"></script>
+</body>
+</html>
