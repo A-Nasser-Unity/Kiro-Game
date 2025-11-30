@@ -908,6 +908,262 @@ integrationRunner.addTest('Different game sessions can have different monsters',
   console.log('Monster selection is random - different sessions may have same or different monsters');
 });
 
+// ============================================
+// INTEGRATION TEST 24: Player Sprite Scaling (2x)
+// ============================================
+
+integrationRunner.addTest('Player sprite scaled by 2x', async () => {
+  setupTestEnvironment();
+  
+  const gameManager = new GameManager();
+  await gameManager.init();
+  
+  const player = gameManager.spriteManager.getPlayer();
+  
+  // Player should be scaled 2x (160x160 instead of 80x80)
+  assertEqual(player.width, 160, 'Player width should be 160 (80 * 2)');
+  assertEqual(player.height, 160, 'Player height should be 160 (80 * 2)');
+});
+
+// ============================================
+// INTEGRATION TEST 25: Monster Sprite Scaling (3x)
+// ============================================
+
+integrationRunner.addTest('Monster sprite scaled by 3x', async () => {
+  setupTestEnvironment();
+  
+  const gameManager = new GameManager();
+  await gameManager.init();
+  
+  const monster = gameManager.spriteManager.getMonster();
+  
+  // Monster should be scaled 3x (240x240 instead of 80x80)
+  assertEqual(monster.width, 240, 'Monster width should be 240 (80 * 3)');
+  assertEqual(monster.height, 240, 'Monster height should be 240 (80 * 3)');
+});
+
+// ============================================
+// INTEGRATION TEST 26: Player Positioned at Bottom Left
+// ============================================
+
+integrationRunner.addTest('Player positioned at bottom left of screen', async () => {
+  setupTestEnvironment();
+  
+  const gameManager = new GameManager();
+  await gameManager.init();
+  
+  const player = gameManager.spriteManager.getPlayer();
+  const canvasDimensions = gameManager.getCanvasDimensions();
+  
+  // Player should be at bottom left with padding
+  assertEqual(player.x, 20, 'Player X should be 20 (left side with padding)');
+  
+  // Player Y should be at bottom (canvas height - player height - padding)
+  const expectedY = canvasDimensions.height - player.height - 20;
+  assertEqual(player.y, expectedY, `Player Y should be ${expectedY} (bottom with padding)`);
+});
+
+// ============================================
+// INTEGRATION TEST 27: Monster Positioned at Bottom Right
+// ============================================
+
+integrationRunner.addTest('Monster positioned at bottom right of screen', async () => {
+  setupTestEnvironment();
+  
+  const gameManager = new GameManager();
+  await gameManager.init();
+  
+  const monster = gameManager.spriteManager.getMonster();
+  const canvasDimensions = gameManager.getCanvasDimensions();
+  
+  // Monster should be at bottom right with padding
+  const expectedX = canvasDimensions.width - monster.width - 20;
+  assertEqual(monster.x, expectedX, `Monster X should be ${expectedX} (right side with padding)`);
+  
+  // Monster Y should be at bottom (canvas height - monster height - padding)
+  const expectedY = canvasDimensions.height - monster.height - 20;
+  assertEqual(monster.y, expectedY, `Monster Y should be ${expectedY} (bottom with padding)`);
+});
+
+// ============================================
+// INTEGRATION TEST 28: Hit Box Scales with Player
+// ============================================
+
+integrationRunner.addTest('Hit box scales proportionally with player sprite', async () => {
+  setupTestEnvironment();
+  
+  const gameManager = new GameManager();
+  await gameManager.init();
+  
+  const player = gameManager.spriteManager.getPlayer();
+  const hitBox = player.getHitBox();
+  
+  // Hit box should scale with player (2x scale)
+  // Original: width=60, height=140
+  // Scaled: width=120, height=280
+  assertEqual(hitBox.width, 120, 'Hit box width should be 120 (60 * 2)');
+  assertEqual(hitBox.height, 280, 'Hit box height should be 280 (140 * 2)');
+});
+
+// ============================================
+// INTEGRATION TEST 29: NotePath Initialization
+// ============================================
+
+integrationRunner.addTest('NotePath initialized at center of screen', async () => {
+  setupTestEnvironment();
+  
+  const gameManager = new GameManager();
+  await gameManager.init();
+  
+  const canvasDimensions = gameManager.getCanvasDimensions();
+  
+  // NotePath should be centered vertically
+  const expectedY = canvasDimensions.height / 2 - 50;
+  assertEqual(gameManager.notePathY, expectedY, `NotePath Y should be ${expectedY} (center of screen)`);
+  
+  // NotePath should have a height
+  assertGreaterThan(gameManager.notePathHeight, 0, 'NotePath height should be greater than 0');
+});
+
+// ============================================
+// INTEGRATION TEST 30: HitBox Positioning
+// ============================================
+
+integrationRunner.addTest('HitBox positioned on NotePath above player', async () => {
+  setupTestEnvironment();
+  
+  const gameManager = new GameManager();
+  await gameManager.init();
+  
+  const player = gameManager.spriteManager.getPlayer();
+  
+  // HitBox should be on the NotePath
+  assertEqual(gameManager.hitBoxY, gameManager.notePathY, 'HitBox Y should match NotePath Y');
+  
+  // HitBox should be to the right of player
+  assertGreaterThan(gameManager.hitBoxX, player.x + player.width, 
+    'HitBox X should be to the right of player');
+  
+  // HitBox should have dimensions
+  assertGreaterThan(gameManager.hitBoxWidth, 0, 'HitBox width should be greater than 0');
+  assertGreaterThan(gameManager.hitBoxHeight, 0, 'HitBox height should be greater than 0');
+});
+
+// ============================================
+// INTEGRATION TEST 31: Notes Spawn Above NotePath
+// ============================================
+
+integrationRunner.addTest('Notes spawn above NotePath and move downward', async () => {
+  setupTestEnvironment();
+  
+  const gameManager = new GameManager();
+  await gameManager.init();
+  
+  // Manually start the monster
+  gameManager.monsterHasStarted = true;
+  
+  // Spawn a note
+  gameManager.spawnNote();
+  const notes = gameManager.spriteManager.getNotes();
+  
+  assert(notes.length > 0, 'Note should be spawned');
+  
+  const note = notes[0];
+  
+  // Note should spawn above the NotePath
+  const expectedY = gameManager.notePathY - 100;
+  assertEqual(note.y, expectedY, `Note Y should be above NotePath (${expectedY})`);
+  
+  // Note should start from the right side
+  assertEqual(note.x, gameManager.getCanvasDimensions().width, 'Note should start from right side');
+  
+  // Update note and verify it moves downward
+  const initialY = note.y;
+  note.update(1); // 1 second
+  assertGreaterThan(note.y, initialY, 'Note should move downward');
+});
+
+// ============================================
+// INTEGRATION TEST 32: Random Spawn Intervals
+// ============================================
+
+integrationRunner.addTest('Notes spawn with random intervals', async () => {
+  setupTestEnvironment();
+  
+  const gameManager = new GameManager();
+  await gameManager.init();
+  
+  // Get random intervals multiple times
+  const intervals = [];
+  for (let i = 0; i < 5; i++) {
+    intervals.push(gameManager.getRandomSpawnInterval());
+  }
+  
+  // All intervals should be positive
+  intervals.forEach(interval => {
+    assertGreaterThan(interval, 0, 'Spawn interval should be positive');
+  });
+  
+  // At least some intervals should be different (random)
+  const uniqueIntervals = new Set(intervals);
+  assertGreaterThan(uniqueIntervals.size, 1, 'Intervals should vary (random)');
+});
+
+// ============================================
+// INTEGRATION TEST 33: NotePath Moved Up by 30% and Scaled by 3x
+// ============================================
+
+integrationRunner.addTest('NotePath moved up by 30% and scaled by 3x in Y axis', async () => {
+  setupTestEnvironment();
+  
+  const gameManager = new GameManager();
+  await gameManager.init();
+  
+  const canvasDimensions = gameManager.getCanvasDimensions();
+  
+  // NotePath should be moved up by 30%
+  const expectedY = canvasDimensions.height / 2 - (canvasDimensions.height * 0.3) - 50;
+  assertEqual(gameManager.notePathY, expectedY, `NotePath Y should be moved up by 30% (${expectedY})`);
+  
+  // NotePath should be scaled by 3x in Y axis
+  assertEqual(gameManager.notePathHeight, 300, 'NotePath height should be 300 (100 * 3)');
+});
+
+// ============================================
+// INTEGRATION TEST 34: HitBox Collision Detection with Custom HitBox
+// ============================================
+
+integrationRunner.addTest('HitBox collision detection works with custom HitBox', async () => {
+  setupTestEnvironment();
+  
+  const gameManager = new GameManager();
+  await gameManager.init();
+  
+  // Manually start the monster
+  gameManager.monsterHasStarted = true;
+  
+  // Spawn a note
+  gameManager.spawnNote();
+  const notes = gameManager.spriteManager.getNotes();
+  const note = notes[0];
+  
+  // Move note to HitBox position
+  note.x = gameManager.hitBoxX + 10;
+  note.y = gameManager.hitBoxY + 5;
+  
+  // Create custom HitBox
+  const customHitBox = {
+    x: gameManager.hitBoxX,
+    y: gameManager.hitBoxY,
+    width: gameManager.hitBoxWidth,
+    height: gameManager.hitBoxHeight
+  };
+  
+  // Check collision with custom HitBox
+  const collision = gameManager.collisionDetector.checkHitBoxCollisionCustom(note, customHitBox);
+  assert(collision, 'Note should collide with custom HitBox');
+});
+
 // Export for use in browser or test runner
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = { integrationRunner };

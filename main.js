@@ -19,6 +19,7 @@ class GameManager {
     
     // Note spawning properties
     this.lastNoteSpawnTime = 0;
+    this.nextNoteSpawnInterval = 0; // Random interval for next note
     this.noteDirections = ['up', 'down', 'left', 'right'];
     
     // Monster delay properties
@@ -28,6 +29,14 @@ class GameManager {
     
     // Background music properties
     this.currentMusicTrack = null;
+    
+    // NotePath and HitBox properties
+    this.notePathY = 0; // Y position of the note path (center of screen)
+    this.notePathHeight = 100; // Height of the note path
+    this.hitBoxX = 0; // X position of hit box
+    this.hitBoxY = 0; // Y position of hit box
+    this.hitBoxWidth = 100; // Width of hit box
+    this.hitBoxHeight = 100; // Height of hit box
   }
 
   // Initialize the game and load all assets
@@ -88,7 +97,9 @@ class GameManager {
       { name: 'good', path: 'GOOD.png' },
       { name: 'miss', path: 'MISS.png' },
       { name: 'win', path: 'Win.png' },
-      { name: 'lose', path: 'Lose.png' }
+      { name: 'lose', path: 'Lose.png' },
+      { name: 'notePath', path: 'NotePath.png' },
+      { name: 'hitBox', path: 'HitBox.png' }
     ];
 
     const audioAssets = [
@@ -181,9 +192,13 @@ class GameManager {
     try {
       const canvasDimensions = this.getCanvasDimensions();
       
-      // Create player sprite on the left side
+      // Create player sprite at bottom left (scaled 2x)
       const playerSprite = this.getSprite('player');
-      const player = new Player(100, canvasDimensions.height / 2 - 40, playerSprite);
+      const playerWidth = 80 * 2; // Scale by 2x
+      const playerHeight = 80 * 2; // Scale by 2x
+      const playerX = 20; // Left side with padding
+      const playerY = canvasDimensions.height - playerHeight - 20; // Bottom with padding
+      const player = new Player(playerX, playerY, playerSprite, playerWidth, playerHeight);
       this.spriteManager.setPlayer(player);
       
       // Randomly select one of three monster sprites
@@ -195,12 +210,18 @@ class GameManager {
       const monsterBaseSpeed = this.difficultyManager.getMonsterBaseSpeed();
       const reducedSpeed = monsterBaseSpeed * 0.2; // 80% reduction = 20% of original
       
-      // Create monster sprite on the right side with reduced speed
+      // Create monster sprite at bottom right (scaled 3x) with reduced speed
+      const monsterWidth = 80 * 3; // Scale by 3x
+      const monsterHeight = 80 * 3; // Scale by 3x
+      const monsterX = canvasDimensions.width - monsterWidth - 20; // Right side with padding
+      const monsterY = canvasDimensions.height - monsterHeight - 20; // Bottom with padding
       const monster = new Monster(
-        canvasDimensions.width - 100,
-        canvasDimensions.height / 2 - 40,
+        monsterX,
+        monsterY,
         monsterSprite,
-        reducedSpeed
+        reducedSpeed,
+        monsterWidth,
+        monsterHeight
       );
       this.spriteManager.setMonster(monster);
       
@@ -211,7 +232,26 @@ class GameManager {
       this.progressManager = new ProgressManager();
       this.progressManager.init();
       
+      // Initialize NotePath (moved up by 30%, scaled in Y by 3)
+      // Original: center of screen (height/2)
+      // Moved up by 30%: height/2 - (height * 0.3)
+      this.notePathY = canvasDimensions.height / 2 - (canvasDimensions.height * 0.3) - 50;
+      this.notePathHeight = 100 * 3; // Scale Y axis by 3 (300 pixels)
+      
+      // Initialize HitBox (on NotePath, above player, a bit to the right)
+      const hitBoxImage = this.getSprite('hitBox');
+      if (hitBoxImage) {
+        this.hitBoxWidth = 120; // Width of hit box
+        this.hitBoxHeight = 100 * 3; // Scale Y axis by 3 (300 pixels)
+        this.hitBoxX = playerX + playerWidth + 20; // To the right of player
+        this.hitBoxY = this.notePathY; // On the note path
+      }
+      
       console.log(`Sprites initialized successfully - Monster: ${randomMonsterKey}, Speed: ${reducedSpeed}`);
+      console.log(`Player: ${playerWidth}x${playerHeight} at (${playerX}, ${playerY})`);
+      console.log(`Monster: ${monsterWidth}x${monsterHeight} at (${monsterX}, ${monsterY})`);
+      console.log(`NotePath: Y=${this.notePathY}, Height=${this.notePathHeight}`);
+      console.log(`HitBox: (${this.hitBoxX}, ${this.hitBoxY}) ${this.hitBoxWidth}x${this.hitBoxHeight}`);
       return true;
     } catch (error) {
       console.error('Error initializing sprites:', error);
@@ -382,11 +422,10 @@ class GameManager {
       // Get canvas dimensions
       const canvasDimensions = this.getCanvasDimensions();
       
-      // Spawn note on the right side of the canvas
+      // Spawn note on the right side of the canvas, ABOVE the NotePath
       const noteX = canvasDimensions.width;
-      
-      // Random Y position (between 50 and canvas height - 50)
-      const noteY = Math.random() * (canvasDimensions.height - 100) + 50;
+      // Position note above the NotePath (at the top of the NotePath area)
+      const noteY = this.notePathY - 100; // Spawn 100 pixels above NotePath
       
       // Random direction
       const randomDirection = this.noteDirections[
@@ -430,26 +469,39 @@ class GameManager {
         if (currentTime - this.gameStartTime >= this.monsterStartDelay) {
           this.monsterHasStarted = true;
           this.lastNoteSpawnTime = currentTime; // Reset spawn timer when monster starts
+          this.nextNoteSpawnInterval = this.getRandomSpawnInterval(); // Set random interval
         } else {
           // Monster hasn't started yet, don't spawn notes
           return;
         }
       }
       
-      // Get spawn interval from difficulty manager
-      const spawnInterval = this.difficultyManager.getNoteSpawnInterval();
-      
       // Check if enough time has passed since last spawn
-      if (currentTime - this.lastNoteSpawnTime >= spawnInterval) {
+      if (currentTime - this.lastNoteSpawnTime >= this.nextNoteSpawnInterval) {
         // Spawn a new note
         this.spawnNote();
         
         // Update last spawn time
         this.lastNoteSpawnTime = currentTime;
+        
+        // Set random interval for next note
+        this.nextNoteSpawnInterval = this.getRandomSpawnInterval();
       }
     } catch (error) {
       console.error('Error updating note spawning:', error);
     }
+  }
+
+  // Get random spawn interval between notes
+  getRandomSpawnInterval() {
+    // Get base spawn interval from difficulty manager
+    const baseInterval = this.difficultyManager.getNoteSpawnInterval();
+    
+    // Add randomness: ±50% of base interval
+    const minInterval = baseInterval * 0.5;
+    const maxInterval = baseInterval * 1.5;
+    
+    return Math.random() * (maxInterval - minInterval) + minInterval;
   }
 
   // Reset note spawning timer
@@ -501,7 +553,7 @@ class GameManager {
       this.effectManager.update(deltaTime);
 
       // Remove off-screen notes
-      this.spriteManager.removeOffScreenNotes(this.canvas.width);
+      this.spriteManager.removeOffScreenNotes(this.canvas.height);
 
       // Check for missed notes
       this.checkMissedNotes();
@@ -531,6 +583,14 @@ class GameManager {
       // Get all active notes
       const notes = this.spriteManager.getNotes();
 
+      // Create custom HitBox object from GameManager's HitBox properties
+      const customHitBox = {
+        x: this.hitBoxX,
+        y: this.hitBoxY,
+        width: this.hitBoxWidth,
+        height: this.hitBoxHeight
+      };
+
       // Check each note for potential hits
       notes.forEach(note => {
         // Skip if note is already hit
@@ -538,8 +598,8 @@ class GameManager {
           return;
         }
 
-        // Process hit for this note
-        const hitType = this.collisionDetector.processHit(note, activeDirections);
+        // Process hit for this note using custom HitBox
+        const hitType = this.collisionDetector.processHit(note, activeDirections, customHitBox);
 
         if (hitType) {
           // Handle successful hit
@@ -777,6 +837,12 @@ class GameManager {
       this.ctx.fillStyle = '#1a1a1a';
       this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
 
+      // Render NotePath (semi-transparent, full width)
+      this.renderNotePath();
+      
+      // Render HitBox
+      this.renderHitBox();
+
       // Render all sprites
       this.spriteManager.render(this.ctx);
 
@@ -787,6 +853,59 @@ class GameManager {
       // this.drawDebugInfo();
     } catch (error) {
       console.error('Error rendering game:', error);
+    }
+  }
+
+  // Render the NotePath background
+  renderNotePath() {
+    try {
+      const notePath = this.getSprite('notePath');
+      if (!notePath) {
+        console.warn('NotePath sprite not found');
+        return;
+      }
+
+      // Save canvas state
+      this.ctx.save();
+
+      // Set opacity to 50%
+      this.ctx.globalAlpha = 0.5;
+
+      // Draw NotePath across full width at center
+      this.ctx.drawImage(
+        notePath,
+        0, // X: start at left edge
+        this.notePathY, // Y: center of screen
+        this.canvas.width, // Width: full canvas width
+        this.notePathHeight // Height: note path height
+      );
+
+      // Restore canvas state
+      this.ctx.restore();
+    } catch (error) {
+      console.error('Error rendering NotePath:', error);
+    }
+  }
+
+  // Render the HitBox
+  renderHitBox() {
+    try {
+      const hitBox = this.getSprite('hitBox');
+      if (!hitBox) {
+        console.warn('HitBox sprite not found');
+        return;
+      }
+
+      // Draw HitBox on the NotePath
+      this.ctx.drawImage(
+        hitBox,
+        this.hitBoxX, // X: above player, to the right
+        this.hitBoxY, // Y: on the note path
+        this.hitBoxWidth, // Width
+        this.hitBoxHeight // Height
+      );
+    } catch (error) {
+      console.error('Error rendering HitBox:', error);
     }
   }
 
@@ -836,11 +955,13 @@ class Player {
     this.width = width;
     this.height = height;
     
-    // Hit box properties - area where notes must be hit
-    this.hitBoxX = x + 10;
-    this.hitBoxY = y - 60;
-    this.hitBoxWidth = 60;
-    this.hitBoxHeight = 140;
+    // Hit box properties - area where notes must be hit (scaled proportionally)
+    // Hit box is positioned above the player sprite
+    const scale = width / 80; // Calculate scale factor relative to default 80px
+    this.hitBoxX = x + (10 * scale);
+    this.hitBoxY = y - (60 * scale);
+    this.hitBoxWidth = 60 * scale;
+    this.hitBoxHeight = 140 * scale;
   }
 
   // Render the player sprite
@@ -941,9 +1062,9 @@ class Note {
     this.id = Math.random(); // Unique identifier for this note
   }
 
-  // Update note position (move leftward)
+  // Update note position (move downward)
   update(deltaTime) {
-    this.x -= this.speed * deltaTime;
+    this.y += this.speed * deltaTime;
   }
 
   // Render the note sprite
@@ -953,9 +1074,9 @@ class Note {
     }
   }
 
-  // Check if note is off screen (left side)
-  isOffScreen(canvasWidth) {
-    return this.x + this.width < 0;
+  // Check if note is off screen (bottom side)
+  isOffScreen(canvasHeight) {
+    return this.y > canvasHeight;
   }
 
   // Get note position
@@ -1088,9 +1209,9 @@ class CollisionDetector {
     this.goodWindow = 100;    // ±100ms for good hit
     
     // Miss collider position (where notes are considered "missed" if they pass)
-    // This is positioned slightly before the hit box
-    this.missColliderX = player.hitBoxX - 20;
-    this.missColliderWidth = 20;
+    // This is positioned slightly below the hit box (notes move downward)
+    this.missColliderY = player.hitBoxY + player.hitBoxHeight + 20;
+    this.missColliderHeight = 20;
   }
 
   // Check if a note overlaps with the hit box
@@ -1114,12 +1235,12 @@ class CollisionDetector {
 
   // Get the timing accuracy for a note (perfect, good, or miss)
   getTimingWindow(note) {
-    // Calculate the center of the hit box
-    const hitBoxCenterX = this.player.hitBoxX + this.player.hitBoxWidth / 2;
-    const noteX = note.getPosition().x + note.width / 2; // Center of note
+    // Calculate the center of the hit box (Y-axis, since notes move vertically)
+    const hitBoxCenterY = this.player.hitBoxY + this.player.hitBoxHeight / 2;
+    const noteY = note.getPosition().y + note.height / 2; // Center of note
     
     // Calculate distance from note center to hit box center
-    const distanceFromCenter = Math.abs(hitBoxCenterX - noteX);
+    const distanceFromCenter = Math.abs(hitBoxCenterY - noteY);
     
     // Convert distance to time offset (in milliseconds)
     // Based on how far the note is from the perfect center
@@ -1141,9 +1262,9 @@ class CollisionDetector {
       return false;
     }
 
-    // Check if note has passed the miss collider
+    // Check if note has passed the miss collider (moved below it)
     const noteBounds = note.getBounds();
-    return noteBounds.x + noteBounds.width < this.missColliderX;
+    return noteBounds.y > this.missColliderY;
   }
 
   // Check if a note is in the hit box and matches the pressed direction
@@ -1152,10 +1273,13 @@ class CollisionDetector {
     return pressedDirections.includes(note.getDirection());
   }
 
-  // Process a hit for a note
-  processHit(note, pressedDirections) {
+  // Process a hit for a note (with custom HitBox)
+  processHit(note, pressedDirections, customHitBox = null) {
+    // Use custom HitBox if provided, otherwise use player's hit box
+    const hitBox = customHitBox || this.player.getHitBox();
+    
     // Check if note is in hit box
-    if (!this.checkHitBoxCollision(note)) {
+    if (!this.checkHitBoxCollisionCustom(note, hitBox)) {
       return null;
     }
 
@@ -1173,6 +1297,14 @@ class CollisionDetector {
     }
 
     return null;
+  }
+
+  // Check if a note overlaps with a custom hit box
+  checkHitBoxCollisionCustom(note, hitBox) {
+    const noteBounds = note.getBounds();
+
+    // Check if note bounds overlap with hit box
+    return this.rectanglesOverlap(noteBounds, hitBox);
   }
 
   // Update miss collider position based on player position
@@ -1286,8 +1418,8 @@ class SpriteManager {
   }
 
   // Remove off-screen notes
-  removeOffScreenNotes(canvasWidth) {
-    this.notes = this.notes.filter(note => !note.isOffScreen(canvasWidth));
+  removeOffScreenNotes(canvasHeight) {
+    this.notes = this.notes.filter(note => !note.isOffScreen(canvasHeight));
   }
 }
 
