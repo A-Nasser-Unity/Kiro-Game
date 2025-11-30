@@ -19,7 +19,9 @@ class GameManager {
     
     // Note spawning properties
     this.lastNoteSpawnTime = 0;
-    this.nextNoteSpawnInterval = 0; // Random interval for next note
+    this.minSpawn = 300;  // 0.3 seconds minimum between spawns
+    this.maxSpawn = 1000; // 1 seconds maximum between spawns
+    this.nextSpawnInterval = 0; // Will be set randomly
     this.noteDirections = ['up', 'down', 'left', 'right'];
     
     // Monster delay properties
@@ -485,7 +487,7 @@ class GameManager {
     }
   }
 
-  // Update note spawning based on difficulty settings
+  // Update note spawning with randomized interval
   updateNoteSpawning() {
     try {
       // Get current time
@@ -497,44 +499,38 @@ class GameManager {
         if (currentTime - this.gameStartTime >= this.monsterStartDelay) {
           this.monsterHasStarted = true;
           this.lastNoteSpawnTime = currentTime; // Reset spawn timer when monster starts
-          this.nextNoteSpawnInterval = this.getRandomSpawnInterval(); // Set random interval
+          this.nextSpawnInterval = this.getRandomSpawnInterval(); // Set first random interval
         } else {
           // Monster hasn't started yet, don't spawn notes
           return;
         }
       }
       
-      // Check if enough time has passed since last spawn
-      if (currentTime - this.lastNoteSpawnTime >= this.nextNoteSpawnInterval) {
+      // Check if enough time has passed since last spawn (randomized interval)
+      if (currentTime - this.lastNoteSpawnTime >= this.nextSpawnInterval) {
         // Spawn a new note
         this.spawnNote();
         
         // Update last spawn time
         this.lastNoteSpawnTime = currentTime;
         
-        // Set random interval for next note
-        this.nextNoteSpawnInterval = this.getRandomSpawnInterval();
+        // Set next random interval
+        this.nextSpawnInterval = this.getRandomSpawnInterval();
       }
     } catch (error) {
       console.error('Error updating note spawning:', error);
     }
   }
 
-  // Get random spawn interval between notes
+  // Get random spawn interval between minSpawn and maxSpawn
   getRandomSpawnInterval() {
-    // Get base spawn interval from difficulty manager
-    const baseInterval = this.difficultyManager.getNoteSpawnInterval();
-    
-    // Add randomness: ±50% of base interval
-    const minInterval = baseInterval * 0.5;
-    const maxInterval = baseInterval * 1.5;
-    
-    return Math.random() * (maxInterval - minInterval) + minInterval;
+    return Math.random() * (this.maxSpawn - this.minSpawn) + this.minSpawn;
   }
 
   // Reset note spawning timer
   resetNoteSpawning() {
     this.lastNoteSpawnTime = Date.now();
+    this.nextSpawnInterval = this.getRandomSpawnInterval();
   }
 
   // Show main menu
@@ -897,6 +893,11 @@ class GameManager {
       };
       this.effectManager.createEffect('miss', effectPosition, this.assets.sprites);
 
+      // Subtract 5 from progress bar on miss (only if progress > 0)
+      if (this.progressManager.getProgress() > 0) {
+        this.progressManager.subtractProgress(5);
+      }
+
       // Optionally increase monster speed on miss
       const monster = this.spriteManager.getMonster();
       if (monster) {
@@ -904,7 +905,7 @@ class GameManager {
         monster.increaseSpeed(speedIncrement);
       }
 
-      console.log('Note missed!');
+      console.log('Note missed! Progress: -5%');
       return true;
     } catch (error) {
       console.error('Error handling miss:', error);
@@ -1734,6 +1735,21 @@ class ProgressManager {
 
     // Add progress and cap at 100%
     this.progress = Math.min(this.progress + amount, 100);
+
+    // Update UI
+    this.updateUI();
+  }
+
+  // Subtract progress by a specified amount (floor at 0)
+  subtractProgress(amount) {
+    // Ensure amount is valid
+    if (typeof amount !== 'number' || amount < 0) {
+      console.warn('Invalid progress amount:', amount);
+      return;
+    }
+
+    // Subtract progress and floor at 0%
+    this.progress = Math.max(this.progress - amount, 0);
 
     // Update UI
     this.updateUI();
