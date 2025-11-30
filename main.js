@@ -447,8 +447,21 @@ class GameManager {
       // Get note speed from difficulty manager
       const noteSpeed = this.difficultyManager.getNoteSpeed();
       
-      // Create new note
-      const note = new Note(noteX, noteY, randomDirection, noteSprite, noteSpeed);
+      // Determine note size based on direction
+      let noteWidth, noteHeight;
+      if (randomDirection === 'up' || randomDirection === 'down') {
+        noteWidth = 38;
+        noteHeight = 70;
+      } else { // left or right
+        noteWidth = 70;
+        noteHeight = 38;
+      }
+      
+      // Center note on NotePath Y-axis
+      const centeredNoteY = this.notePathY + (this.notePathHeight / 2) - (noteHeight / 2);
+      
+      // Create new note with custom size
+      const note = new Note(noteX, centeredNoteY, randomDirection, noteSprite, noteSpeed, noteWidth, noteHeight);
       
       // Add note to sprite manager
       this.spriteManager.addNote(note);
