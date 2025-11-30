@@ -85,6 +85,7 @@ class GameManager {
   // Load all sprite images and audio files
   async loadAssets() {
     const spriteAssets = [
+      { name: 'levelBG', path: 'LevelBG.png' },
       { name: 'player', path: 'Boy1.png' },
       { name: 'monster1', path: 'M1.png' },
       { name: 'monster2', path: 'M2.png' },
@@ -867,6 +868,9 @@ class GameManager {
       this.ctx.fillStyle = '#1a1a1a';
       this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
 
+      // Render background (LevelBG) - lowest layer
+      this.renderBackground();
+
       // Render NotePath (semi-transparent, full width)
       this.renderNotePath();
       
@@ -883,6 +887,28 @@ class GameManager {
       // this.drawDebugInfo();
     } catch (error) {
       console.error('Error rendering game:', error);
+    }
+  }
+
+  // Render the background image
+  renderBackground() {
+    try {
+      const levelBG = this.getSprite('levelBG');
+      if (!levelBG) {
+        console.warn('LevelBG sprite not found');
+        return;
+      }
+
+      // Draw background centered on canvas, covering entire canvas
+      this.ctx.drawImage(
+        levelBG,
+        0, // X: start at left edge
+        0, // Y: start at top edge
+        this.canvas.width, // Width: full canvas width
+        this.canvas.height // Height: full canvas height
+      );
+    } catch (error) {
+      console.error('Error rendering background:', error);
     }
   }
 
