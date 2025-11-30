@@ -820,7 +820,7 @@ class GameManager {
       note.markAsHit();
 
       // Determine progress amount based on hit type
-      const progressAmount = hitType === 'perfect' ? 10 : 5;
+      const progressAmount = hitType === 'perfect' ? 4 : 2;
 
       // Update progress bar
       this.progressManager.addProgress(progressAmount);
@@ -947,8 +947,9 @@ class GameManager {
       // Stop background music
       this.stopBackgroundMusic();
 
-      // Play end game audio
-      this.audioManager.play(result);
+      // Play end game audio (win or lose)
+      const audioName = result === 'won' ? 'win' : 'lose';
+      this.audioManager.play(audioName);
 
       // Display end game screen
       this.displayGameOverScreen(result);
