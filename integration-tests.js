@@ -713,7 +713,89 @@ integrationRunner.addTest('Notes do not spawn until monster starts moving', asyn
 });
 
 // ============================================
-// INTEGRATION TEST 17: Complete Game Session (Initialization → Play → Win)
+// INTEGRATION TEST 17: Background Music Selection and Playback
+// ============================================
+
+integrationRunner.addTest('Background music selection and playback', async () => {
+  setupTestEnvironment();
+  
+  const gameManager = new GameManager();
+  await gameManager.init();
+  
+  // Start game (should play background music)
+  gameManager.start();
+  
+  // Verify a music track was selected
+  assert(gameManager.currentMusicTrack, 'A music track should be selected');
+  assertArrayIncludes(['track1', 'track2', 'track3'], gameManager.currentMusicTrack, 
+    'Selected track should be one of the three available tracks');
+  
+  // Verify the audio element exists
+  const audio = gameManager.assets.audio[gameManager.currentMusicTrack];
+  assert(audio, 'Audio element should exist for selected track');
+  
+  // Verify audio is set to loop
+  assert(audio.loop, 'Background music should be set to loop');
+  
+  // Verify volume is set
+  assertGreaterThan(audio.volume, 0, 'Background music volume should be greater than 0');
+});
+
+// ============================================
+// INTEGRATION TEST 18: Background Music Stops on Game End
+// ============================================
+
+integrationRunner.addTest('Background music stops when game ends', async () => {
+  setupTestEnvironment();
+  
+  const gameManager = new GameManager();
+  await gameManager.init();
+  gameManager.gameState = 'playing';
+  
+  // Start game
+  gameManager.start();
+  
+  const currentTrack = gameManager.currentMusicTrack;
+  assert(currentTrack, 'Music track should be playing');
+  
+  // End the game
+  gameManager.endGame('won');
+  
+  // Verify music was stopped
+  const audio = gameManager.assets.audio[currentTrack];
+  assert(audio.paused, 'Background music should be paused when game ends');
+  assertEqual(audio.currentTime, 0, 'Background music should be reset to start');
+});
+
+// ============================================
+// INTEGRATION TEST 19: Background Music Restarts on Game Restart
+// ============================================
+
+integrationRunner.addTest('Background music restarts when game restarts', async () => {
+  setupTestEnvironment();
+  
+  const gameManager = new GameManager();
+  await gameManager.init();
+  gameManager.gameState = 'playing';
+  
+  // Start game
+  gameManager.start();
+  const firstTrack = gameManager.currentMusicTrack;
+  
+  // End game
+  gameManager.endGame('won');
+  
+  // Restart game
+  gameManager.restartGame();
+  
+  // Verify a new music track is playing (may be same or different)
+  assert(gameManager.currentMusicTrack, 'A music track should be selected after restart');
+  assertArrayIncludes(['track1', 'track2', 'track3'], gameManager.currentMusicTrack, 
+    'Selected track should be one of the three available tracks');
+});
+
+// ============================================
+// INTEGRATION TEST 20: Complete Game Session (Initialization → Play → Win)
 // ============================================
 
 integrationRunner.addTest('Complete game session (initialization → play → win)', async () => {
@@ -738,6 +820,92 @@ integrationRunner.addTest('Complete game session (initialization → play → wi
   // Verify game over screen
   const gameOverScreen = document.getElementById('gameOverScreen');
   assertEqual(gameOverScreen.style.display, 'flex', 'Game over screen should be visible');
+});
+
+// ============================================
+// INTEGRATION TEST 21: Random Monster Selection
+// ============================================
+
+integrationRunner.addTest('Random monster selection at game start', async () => {
+  setupTestEnvironment();
+  
+  const gameManager = new GameManager();
+  await gameManager.init();
+  
+  const monster = gameManager.spriteManager.getMonster();
+  assert(monster, 'Monster should be created');
+  assert(monster.sprite, 'Monster should have a sprite');
+  
+  // Verify monster sprite is one of the three available
+  const monsterSprites = [
+    gameManager.assets.sprites.monster1,
+    gameManager.assets.sprites.monster2,
+    gameManager.assets.sprites.monster3
+  ];
+  
+  assert(monsterSprites.includes(monster.sprite), 'Monster sprite should be one of the three available');
+});
+
+// ============================================
+// INTEGRATION TEST 22: Monster Speed Reduction (80% reduction)
+// ============================================
+
+integrationRunner.addTest('Monster speed reduced by 80%', async () => {
+  setupTestEnvironment();
+  
+  const gameManager = new GameManager();
+  await gameManager.init();
+  
+  const monster = gameManager.spriteManager.getMonster();
+  const difficultyManager = gameManager.difficultyManager;
+  
+  // Get the original base speed from difficulty settings
+  const originalBaseSpeed = difficultyManager.getMonsterBaseSpeed();
+  
+  // Monster speed should be 20% of original (80% reduction)
+  const expectedSpeed = originalBaseSpeed * 0.2;
+  
+  assertEqual(monster.baseSpeed, expectedSpeed, 
+    `Monster base speed should be 20% of original (${expectedSpeed}), but got ${monster.baseSpeed}`);
+  
+  // Verify current speed is also reduced
+  assertEqual(monster.currentSpeed, expectedSpeed, 
+    'Monster current speed should match reduced base speed');
+});
+
+// ============================================
+// INTEGRATION TEST 23: Multiple Game Sessions Have Different Monsters
+// ============================================
+
+integrationRunner.addTest('Different game sessions can have different monsters', async () => {
+  setupTestEnvironment();
+  
+  const gameManager1 = new GameManager();
+  await gameManager1.init();
+  const monster1Sprite = gameManager1.spriteManager.getMonster().sprite;
+  
+  // Clean up first game
+  const canvas1 = document.getElementById('gameCanvas');
+  if (canvas1) canvas1.remove();
+  
+  setupTestEnvironment();
+  
+  const gameManager2 = new GameManager();
+  await gameManager2.init();
+  const monster2Sprite = gameManager2.spriteManager.getMonster().sprite;
+  
+  // Both should be valid monster sprites
+  const monsterSprites = [
+    gameManager2.assets.sprites.monster1,
+    gameManager2.assets.sprites.monster2,
+    gameManager2.assets.sprites.monster3
+  ];
+  
+  assert(monsterSprites.includes(monster1Sprite), 'First monster should be valid');
+  assert(monsterSprites.includes(monster2Sprite), 'Second monster should be valid');
+  
+  // Note: They might be the same or different due to randomness
+  console.log('Monster selection is random - different sessions may have same or different monsters');
 });
 
 // Export for use in browser or test runner

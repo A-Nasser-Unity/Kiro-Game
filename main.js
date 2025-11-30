@@ -25,6 +25,9 @@ class GameManager {
     this.monsterStartDelay = 3000; // 3 seconds in milliseconds
     this.gameStartTime = 0;
     this.monsterHasStarted = false;
+    
+    // Background music properties
+    this.currentMusicTrack = null;
   }
 
   // Initialize the game and load all assets
@@ -74,7 +77,9 @@ class GameManager {
   async loadAssets() {
     const spriteAssets = [
       { name: 'player', path: 'Boy1.png' },
-      { name: 'monster', path: 'M1.png' },
+      { name: 'monster1', path: 'M1.png' },
+      { name: 'monster2', path: 'M2.png' },
+      { name: 'monster3', path: 'M3.png' },
       { name: 'noteUp', path: 'UpArrow.png' },
       { name: 'noteDown', path: 'Down Arrow.png' },
       { name: 'noteLeft', path: 'LeftArrow.png' },
@@ -91,7 +96,10 @@ class GameManager {
       { name: 'good', path: 'Good.wav' },
       { name: 'miss', path: 'Miss.wav' },
       { name: 'win', path: 'Win.wav' },
-      { name: 'lose', path: 'Lose.wav' }
+      { name: 'lose', path: 'Lose.wav' },
+      { name: 'track1', path: 'Track1.wav' },
+      { name: 'track2', path: 'Track2.wav' },
+      { name: 'track3', path: 'Track3.wav' }
     ];
 
     this.totalAssets = spriteAssets.length + audioAssets.length;
@@ -137,16 +145,26 @@ class GameManager {
   loadAudio(name, path) {
     return new Promise((resolve, reject) => {
       const audio = new Audio();
-      audio.oncanplaythrough = () => {
+      
+      // Handle successful load - use loadedmetadata as fallback for large files
+      const handleSuccess = () => {
         this.assets.audio[name] = audio;
         this.loadedAssets++;
+        // Remove event listeners to prevent duplicate calls
+        audio.removeEventListener('canplaythrough', handleSuccess);
+        audio.removeEventListener('loadedmetadata', handleSuccess);
         resolve();
       };
+      
+      audio.addEventListener('canplaythrough', handleSuccess, { once: true });
+      audio.addEventListener('loadedmetadata', handleSuccess, { once: true });
+      
       audio.onerror = () => {
         const error = new Error(`Failed to load audio: ${path}`);
         this.assetLoadError = error;
         reject(error);
       };
+      
       audio.src = path;
     });
   }
@@ -168,14 +186,21 @@ class GameManager {
       const player = new Player(100, canvasDimensions.height / 2 - 40, playerSprite);
       this.spriteManager.setPlayer(player);
       
-      // Create monster sprite on the right side
-      const monsterSprite = this.getSprite('monster');
+      // Randomly select one of three monster sprites
+      const monsterOptions = ['monster1', 'monster2', 'monster3'];
+      const randomMonsterKey = monsterOptions[Math.floor(Math.random() * monsterOptions.length)];
+      const monsterSprite = this.getSprite(randomMonsterKey);
+      
+      // Get base speed and reduce by 80% (keep only 20%)
       const monsterBaseSpeed = this.difficultyManager.getMonsterBaseSpeed();
+      const reducedSpeed = monsterBaseSpeed * 0.2; // 80% reduction = 20% of original
+      
+      // Create monster sprite on the right side with reduced speed
       const monster = new Monster(
         canvasDimensions.width - 100,
         canvasDimensions.height / 2 - 40,
         monsterSprite,
-        monsterBaseSpeed
+        reducedSpeed
       );
       this.spriteManager.setMonster(monster);
       
@@ -186,10 +211,98 @@ class GameManager {
       this.progressManager = new ProgressManager();
       this.progressManager.init();
       
-      console.log('Sprites initialized successfully');
+      console.log(`Sprites initialized successfully - Monster: ${randomMonsterKey}, Speed: ${reducedSpeed}`);
       return true;
     } catch (error) {
       console.error('Error initializing sprites:', error);
+      return false;
+    }
+  }
+
+  // Select and play a random background music track
+  playBackgroundMusic() {
+    try {
+      // Array of available music tracks
+      const musicTracks = ['track1', 'track2', 'track3'];
+      
+      // Select a random track
+      const randomTrack = musicTracks[Math.floor(Math.random() * musicTracks.length)];
+      
+      // Get the audio element
+      const audio = this.assets.audio[randomTrack];
+      if (!audio) {
+        console.warn(`Background music track not found: ${randomTrack}`);
+        return false;
+      }
+      
+      console.log(`Audio element found for ${randomTrack}, readyState: ${audio.readyState}`);
+      
+      // Set up the audio to loop
+      audio.loop = true;
+      audio.volume = 0.5; // Set volume to 50% to not overpower sound effects
+      
+      // Reset audio to start
+      audio.currentTime = 0;
+      
+      // Store the current track for later reference
+      this.currentMusicTrack = randomTrack;
+      
+      // Try to play the audio
+      const playPromise = audio.play();
+      if (playPromise !== undefined) {
+        playPromise
+          .then(() => {
+            console.log(`✓ Successfully playing background music: ${randomTrack}`);
+          })
+          .catch(error => {
+            console.warn(`⚠ Background music autoplay blocked (${error.name}): ${error.message}`);
+            console.log('Music will play after user interaction');
+          });
+      } else {
+        console.log(`Background music track selected: ${randomTrack} (older browser)`);
+      }
+      
+      return true;
+    } catch (error) {
+      console.error('Error playing background music:', error);
+      return false;
+    }
+  }
+
+  // Stop background music
+  stopBackgroundMusic() {
+    try {
+      if (this.currentMusicTrack) {
+        const audio = this.assets.audio[this.currentMusicTrack];
+        if (audio) {
+          audio.pause();
+          audio.currentTime = 0;
+        }
+      }
+      return true;
+    } catch (error) {
+      console.error('Error stopping background music:', error);
+      return false;
+    }
+  }
+
+  // Resume background music (for handling autoplay policies)
+  resumeBackgroundMusic() {
+    try {
+      if (this.currentMusicTrack) {
+        const audio = this.assets.audio[this.currentMusicTrack];
+        if (audio && audio.paused) {
+          const playPromise = audio.play();
+          if (playPromise !== undefined) {
+            playPromise.catch(error => {
+              console.warn('Failed to resume background music:', error.message);
+            });
+          }
+        }
+      }
+      return true;
+    } catch (error) {
+      console.error('Error resuming background music:', error);
       return false;
     }
   }
@@ -356,6 +469,9 @@ class GameManager {
     this.monsterHasStarted = false;
     this.resetNoteSpawning();
     this.lastFrameTime = Date.now();
+    
+    // Play background music
+    this.playBackgroundMusic();
 
     // Start the game loop
     this.gameLoop();
@@ -548,6 +664,9 @@ class GameManager {
 
       // Stop spawning notes
       this.lastNoteSpawnTime = Date.now() + 999999; // Prevent further spawning
+      
+      // Stop background music
+      this.stopBackgroundMusic();
 
       // Play end game audio
       this.audioManager.play(result);
@@ -619,6 +738,9 @@ class GameManager {
       if (gameOverScreen) {
         gameOverScreen.style.display = 'none';
       }
+      
+      // Stop current background music
+      this.stopBackgroundMusic();
 
       // Reset all game state
       this.spriteManager.clearNotes();
@@ -895,6 +1017,17 @@ class InputHandler {
   init() {
     document.addEventListener('keydown', (event) => this.onKeyDown(event));
     document.addEventListener('keyup', (event) => this.onKeyUp(event));
+    
+    // Add click listener to resume audio on user interaction (for autoplay policies)
+    document.addEventListener('click', () => this.onUserInteraction(), { once: true });
+  }
+  
+  // Handle user interaction to resume audio
+  onUserInteraction() {
+    // Resume background music if it was blocked by autoplay policies
+    if (window.gameManager) {
+      window.gameManager.resumeBackgroundMusic();
+    }
   }
 
   // Handle key down event
