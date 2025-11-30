@@ -37,6 +37,11 @@ class GameManager {
     this.hitBoxY = 0; // Y position of hit box
     this.hitBoxWidth = 100; // Width of hit box
     this.hitBoxHeight = 100; // Height of hit box
+    
+    // Main menu properties
+    this.isInMenu = true; // Start in menu
+    this.menuMusicPlaying = false;
+    this.playButtonBounds = { x: 0, y: 0, width: 0, height: 0 };
   }
 
   // Initialize the game and load all assets
@@ -86,7 +91,11 @@ class GameManager {
   async loadAssets() {
     const spriteAssets = [
       { name: 'levelBG', path: 'LevelBG.png' },
+      { name: 'menuBG', path: 'MenuBG.jpg' },
+      { name: 'menuTitle', path: 'Title.png' },
+      { name: 'playButton', path: 'PlayButton.png' },
       { name: 'player', path: 'Boy1.png' },
+      { name: 'playerHit', path: 'Boy2.png' },
       { name: 'monster1', path: 'M1.png' },
       { name: 'monster2', path: 'M2.png' },
       { name: 'monster3', path: 'M3.png' },
@@ -111,7 +120,8 @@ class GameManager {
       { name: 'lose', path: 'Lose.wav' },
       { name: 'track1', path: 'Track1.wav' },
       { name: 'track2', path: 'Track2.wav' },
-      { name: 'track3', path: 'Track3.wav' }
+      { name: 'track3', path: 'Track3.wav' },
+      { name: 'menuMusic', path: 'Menu.wav' }
     ];
 
     this.totalAssets = spriteAssets.length + audioAssets.length;
@@ -193,13 +203,15 @@ class GameManager {
     try {
       const canvasDimensions = this.getCanvasDimensions();
       
-      // Create player sprite at bottom left (scaled 2x)
+      // Create player sprite at bottom left
       const playerSprite = this.getSprite('player');
-      const playerWidth = 80 * 2; // Scale by 2x
-      const playerHeight = 80 * 2; // Scale by 2x
+      const playerHitSprite = this.getSprite('playerHit');
+      const playerWidth = 150;
+      const playerHeight = 193;
       const playerX = 20; // Left side with padding
       const playerY = canvasDimensions.height - playerHeight - 20; // Bottom with padding
       const player = new Player(playerX, playerY, playerSprite, playerWidth, playerHeight);
+      player.setHitSprite(playerHitSprite); // Set Boy2.png for hit animation
       this.spriteManager.setPlayer(player);
       
       // Randomly select one of three monster sprites
@@ -525,9 +537,165 @@ class GameManager {
     this.lastNoteSpawnTime = Date.now();
   }
 
+  // Show main menu
+  showMainMenu() {
+    this.isInMenu = true;
+    this.gameState = 'menu';
+    
+    // Hide progress bar during main menu
+    const progressBarContainer = document.querySelector('.progress-bar-container');
+    if (progressBarContainer) {
+      progressBarContainer.style.display = 'none';
+    }
+    
+    // Set up play button bounds (centered at bottom)
+    const playButton = this.getSprite('playButton');
+    if (playButton) {
+      this.playButtonBounds = {
+        x: this.canvas.width / 2 - 80,
+        y: this.canvas.height - 150,
+        width: 140,
+        height: 50
+      };
+    }
+    
+    // Add click listener for play button and menu music
+    this.canvas.addEventListener('click', this.handleMenuClick.bind(this));
+    
+    // Try to play menu music (may be blocked by browser)
+    this.playMenuMusic();
+    
+    // Start menu render loop
+    this.menuLoop();
+  }
+
+  // Handle menu click
+  handleMenuClick(event) {
+    if (!this.isInMenu) return;
+    
+    // Try to play menu music on any click (handles browser autoplay restrictions)
+    if (!this.menuMusicPlaying) {
+      this.playMenuMusic();
+    }
+    
+    const rect = this.canvas.getBoundingClientRect();
+    const clickX = event.clientX - rect.left;
+    const clickY = event.clientY - rect.top;
+    
+    // Check if click is on play button
+    if (
+      clickX >= this.playButtonBounds.x &&
+      clickX <= this.playButtonBounds.x + this.playButtonBounds.width &&
+      clickY >= this.playButtonBounds.y &&
+      clickY <= this.playButtonBounds.y + this.playButtonBounds.height
+    ) {
+      this.startGameFromMenu();
+    }
+  }
+
+  // Start game from menu
+  startGameFromMenu() {
+    this.isInMenu = false;
+    this.stopMenuMusic();
+    
+    // Show progress bar when game starts
+    const progressBarContainer = document.querySelector('.progress-bar-container');
+    if (progressBarContainer) {
+      progressBarContainer.style.display = 'block';
+    }
+    
+    this.start();
+  }
+
+  // Play menu music
+  playMenuMusic() {
+    try {
+      const menuMusic = this.assets.audio['menuMusic'];
+      if (menuMusic && !this.menuMusicPlaying) {
+        menuMusic.loop = true;
+        menuMusic.volume = 0.5;
+        menuMusic.currentTime = 0;
+        
+        const playPromise = menuMusic.play();
+        if (playPromise !== undefined) {
+          playPromise.then(() => {
+            this.menuMusicPlaying = true;
+            console.log('Menu music started playing');
+          }).catch(error => {
+            console.warn('Menu music autoplay blocked - click anywhere to start music:', error.message);
+            this.menuMusicPlaying = false;
+          });
+        }
+      }
+    } catch (error) {
+      console.error('Error playing menu music:', error);
+      this.menuMusicPlaying = false;
+    }
+  }
+
+  // Stop menu music
+  stopMenuMusic() {
+    try {
+      const menuMusic = this.assets.audio['menuMusic'];
+      if (menuMusic) {
+        menuMusic.pause();
+        menuMusic.currentTime = 0;
+        this.menuMusicPlaying = false;
+      }
+    } catch (error) {
+      console.error('Error stopping menu music:', error);
+    }
+  }
+
+  // Menu render loop
+  menuLoop = () => {
+    if (!this.isInMenu) return;
+    
+    this.renderMenu();
+    requestAnimationFrame(this.menuLoop);
+  }
+
+  // Render main menu
+  renderMenu() {
+    try {
+      // Draw menu background
+      const menuBG = this.getSprite('menuBG');
+      if (menuBG) {
+        this.ctx.drawImage(menuBG, 0, 0, this.canvas.width, this.canvas.height);
+      } else {
+        this.ctx.fillStyle = '#1a1a1a';
+        this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+      }
+      
+      // Draw title at top center
+      const title = this.getSprite('menuTitle');
+      if (title) {
+        const titleWidth = 300;
+        const titleHeight = 151;
+        const titleX = this.canvas.width / 2 - titleWidth / 2;
+        const titleY = 50;
+        this.ctx.drawImage(title, titleX, titleY, titleWidth, titleHeight);
+      }
+      
+      // Draw play button at bottom center
+      const playButton = this.getSprite('playButton');
+      if (playButton) {
+        this.ctx.drawImage(
+          playButton,
+          this.playButtonBounds.x,
+          this.playButtonBounds.y,
+          this.playButtonBounds.width,
+          this.playButtonBounds.height
+        );
+      }
+    } catch (error) {
+      console.error('Error rendering menu:', error);
+    }
+  }
+
   // Start the game and begin the main game loop
   start() {
-    if (this.gameState !== 'ready') {
+    if (this.gameState !== 'ready' && this.gameState !== 'menu') {
       console.warn('Game is not ready to start');
       return false;
     }
@@ -663,6 +831,12 @@ class GameManager {
 
       // Play audio effect
       this.audioManager.play(hitType);
+
+      // Trigger player hit animation for PERFECT or Good hits
+      const player = this.spriteManager.getPlayer();
+      if (player) {
+        player.playHitAnimation();
+      }
 
       // Create visual effect at center of canvas (X-axis) and Y=60
       const effectPosition = {
@@ -1009,8 +1183,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Store game manager globally for access by other modules
     window.gameManager = gameManager;
     
-    // Start the game automatically
-    gameManager.start();
+    // Show main menu instead of starting game automatically
+    gameManager.showMainMenu();
   }
 });
 
@@ -1021,8 +1195,14 @@ class Player {
     this.x = x;
     this.y = y;
     this.sprite = sprite;
+    this.hitSprite = null; // Boy2.png for hit animation
     this.width = width;
     this.height = height;
+    
+    // Hit animation properties
+    this.isPlayingHitAnimation = false;
+    this.hitAnimationTimer = 0;
+    this.hitAnimationDuration = 200; // 200ms (0.2 seconds)
     
     // Hit box properties - area where notes must be hit (scaled proportionally)
     // Hit box is positioned above the player sprite
@@ -1033,10 +1213,34 @@ class Player {
     this.hitBoxHeight = 140 * scale;
   }
 
+  // Set the hit sprite (Boy2.png)
+  setHitSprite(hitSprite) {
+    this.hitSprite = hitSprite;
+  }
+
+  // Trigger hit animation
+  playHitAnimation() {
+    this.isPlayingHitAnimation = true;
+    this.hitAnimationTimer = this.hitAnimationDuration;
+  }
+
+  // Update animation state
+  update(deltaTime) {
+    if (this.isPlayingHitAnimation) {
+      this.hitAnimationTimer -= deltaTime * 1000; // Convert to ms
+      if (this.hitAnimationTimer <= 0) {
+        this.isPlayingHitAnimation = false;
+        this.hitAnimationTimer = 0;
+      }
+    }
+  }
+
   // Render the player sprite
   render(ctx) {
-    if (this.sprite) {
-      ctx.drawImage(this.sprite, this.x, this.y, this.width, this.height);
+    // Show hit sprite during animation, otherwise show default sprite
+    const currentSprite = (this.isPlayingHitAnimation && this.hitSprite) ? this.hitSprite : this.sprite;
+    if (currentSprite) {
+      ctx.drawImage(currentSprite, this.x, this.y, this.width, this.height);
     }
   }
 
@@ -1447,6 +1651,11 @@ class SpriteManager {
 
   // Update all sprites
   update(deltaTime, monsterHasStarted = true) {
+    // Update player (for hit animation)
+    if (this.player) {
+      this.player.update(deltaTime);
+    }
+
     // Update monster only if it has started
     if (this.monster && monsterHasStarted) {
       this.monster.update(deltaTime);
@@ -1715,66 +1924,11 @@ class EffectManager {
 // Difficulty Manager - Manages game difficulty settings and parameters
 class DifficultyManager {
   constructor() {
-    // Define difficulty presets
-    this.presets = {
-      easy: {
-        noteSpawnInterval: 2000,    // 2 seconds between note spawns
-        noteSpeed: 150,              // Pixels per second
-        monsterBaseSpeed: 30         // Pixels per second
-      },
-      normal: {
-        noteSpawnInterval: 1500,    // 1.5 seconds between note spawns
-        noteSpeed: 250,              // Pixels per second
-        monsterBaseSpeed: 50         // Pixels per second
-      },
-      hard: {
-        noteSpawnInterval: 1000,    // 1 second between note spawns
-        noteSpeed: 350,              // Pixels per second
-        monsterBaseSpeed: 80         // Pixels per second
-      }
-    };
-
-    // Current difficulty settings
-    this.currentDifficulty = 'normal';
-    this.noteSpawnInterval = this.presets.normal.noteSpawnInterval;
-    this.noteSpeed = this.presets.normal.noteSpeed;
-    this.monsterBaseSpeed = this.presets.normal.monsterBaseSpeed;
-    this.monsterSpeedIncrement = 10; // Speed increase on miss (optional feature)
-  }
-
-  // Set difficulty by preset name
-  setDifficulty(difficultyName) {
-    // Validate difficulty name
-    if (!this.presets[difficultyName]) {
-      console.warn(`Invalid difficulty: ${difficultyName}. Using normal.`);
-      difficultyName = 'normal';
-    }
-
-    this.currentDifficulty = difficultyName;
-    const preset = this.presets[difficultyName];
-
-    // Apply preset settings
-    this.noteSpawnInterval = preset.noteSpawnInterval;
-    this.noteSpeed = preset.noteSpeed;
-    this.monsterBaseSpeed = preset.monsterBaseSpeed;
-
-    console.log(`Difficulty set to: ${difficultyName}`);
-    return true;
-  }
-
-  // Get current difficulty name
-  getDifficulty() {
-    return this.currentDifficulty;
-  }
-
-  // Set note spawn interval (in milliseconds)
-  setNoteSpawnInterval(interval) {
-    if (typeof interval !== 'number' || interval <= 0) {
-      console.warn('Invalid note spawn interval');
-      return false;
-    }
-    this.noteSpawnInterval = interval;
-    return true;
+    // Fixed game settings (no difficulty variations)
+    this.noteSpawnInterval = 1500;   // 1.5 seconds between note spawns
+    this.noteSpeed = 600;            // Fixed note speed: 400 pixels per second
+    this.monsterBaseSpeed = 50;      // Pixels per second
+    this.monsterSpeedIncrement = 10; // Speed increase on miss
   }
 
   // Get note spawn interval
@@ -1782,29 +1936,9 @@ class DifficultyManager {
     return this.noteSpawnInterval;
   }
 
-  // Set note speed (pixels per second)
-  setNoteSpeed(speed) {
-    if (typeof speed !== 'number' || speed <= 0) {
-      console.warn('Invalid note speed');
-      return false;
-    }
-    this.noteSpeed = speed;
-    return true;
-  }
-
-  // Get note speed
+  // Get note speed (fixed at 400)
   getNoteSpeed() {
     return this.noteSpeed;
-  }
-
-  // Set monster base speed (pixels per second)
-  setMonsterBaseSpeed(speed) {
-    if (typeof speed !== 'number' || speed <= 0) {
-      console.warn('Invalid monster base speed');
-      return false;
-    }
-    this.monsterBaseSpeed = speed;
-    return true;
   }
 
   // Get monster base speed
@@ -1812,67 +1946,14 @@ class DifficultyManager {
     return this.monsterBaseSpeed;
   }
 
-  // Set monster speed increment (for speed increase on miss)
-  setMonsterSpeedIncrement(increment) {
-    if (typeof increment !== 'number' || increment < 0) {
-      console.warn('Invalid monster speed increment');
-      return false;
-    }
-    this.monsterSpeedIncrement = increment;
-    return true;
-  }
-
   // Get monster speed increment
   getMonsterSpeedIncrement() {
     return this.monsterSpeedIncrement;
   }
 
-  // Apply difficulty settings to game objects
-  applyDifficultyToGame(spriteManager, gameManager) {
-    try {
-      // Validate inputs
-      if (!spriteManager || !gameManager) {
-        console.warn('Invalid sprite manager or game manager');
-        return false;
-      }
-
-      // Get monster from sprite manager
-      const monster = spriteManager.getMonster();
-      if (!monster) {
-        console.warn('Monster not found in sprite manager');
-        return false;
-      }
-
-      // Apply monster base speed
-      monster.baseSpeed = this.monsterBaseSpeed;
-      monster.resetSpeed();
-
-      console.log('Difficulty settings applied to game');
-      return true;
-    } catch (error) {
-      console.error('Error applying difficulty settings:', error);
-      return false;
-    }
-  }
-
-  // Get all available difficulty presets
-  getAvailableDifficulties() {
-    return Object.keys(this.presets);
-  }
-
-  // Get a specific difficulty preset
-  getDifficultyPreset(difficultyName) {
-    if (!this.presets[difficultyName]) {
-      console.warn(`Difficulty preset not found: ${difficultyName}`);
-      return null;
-    }
-    return { ...this.presets[difficultyName] };
-  }
-
   // Get current settings as an object
   getCurrentSettings() {
     return {
-      difficulty: this.currentDifficulty,
       noteSpawnInterval: this.noteSpawnInterval,
       noteSpeed: this.noteSpeed,
       monsterBaseSpeed: this.monsterBaseSpeed,
@@ -1880,9 +1961,12 @@ class DifficultyManager {
     };
   }
 
-  // Reset to default (normal) difficulty
+  // Reset to default settings
   reset() {
-    this.setDifficulty('normal');
+    this.noteSpawnInterval = 1500;
+    this.noteSpeed = 600;
+    this.monsterBaseSpeed = 50;
+    this.monsterSpeedIncrement = 10;
     return true;
   }
 }
