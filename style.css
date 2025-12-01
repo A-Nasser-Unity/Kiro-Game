@@ -138,6 +138,7 @@ body {
     cursor: pointer;
     transition: all 0.3s ease;
     box-shadow: 0 0 10px #ffffff;
+    margin: 0 20px;
 }
 
 .restart-button:hover {

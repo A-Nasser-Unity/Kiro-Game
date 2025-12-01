@@ -49,6 +49,7 @@ class GameManager {
     this.playButtonBounds = { x: 0, y: 0, width: 0, height: 0 };
     this.infoButtonBounds = { x: 0, y: 0, width: 0, height: 0 };
     this.isInfoVisible = false; // Toggle state for info text
+    this.menuClickHandlerBound = null; // Store bound handler to prevent duplicates
     
     // Loading screen properties
     this.isLoading = true;
@@ -642,8 +643,12 @@ class GameManager {
     // Reset info visibility when entering menu
     this.isInfoVisible = false;
     
-    // Add click listener for play button and menu music
-    this.canvas.addEventListener('click', this.handleMenuClick.bind(this));
+    // Remove old click listener if exists, then add new one
+    if (this.menuClickHandlerBound) {
+      this.canvas.removeEventListener('click', this.menuClickHandlerBound);
+    }
+    this.menuClickHandlerBound = this.handleMenuClick.bind(this);
+    this.canvas.addEventListener('click', this.menuClickHandlerBound);
     
     // Try to play menu music (may be blocked by browser)
     this.playMenuMusic();
@@ -1132,9 +1137,61 @@ class GameManager {
         this.restartGame();
       });
 
+      // Set up main menu button
+      const mainMenuButton = document.getElementById('mainMenuButton');
+      if (mainMenuButton) {
+        mainMenuButton.addEventListener('click', () => {
+          this.returnToMainMenu();
+        });
+      }
+
       return true;
     } catch (error) {
       console.error('Error setting up restart button:', error);
+      return false;
+    }
+  }
+
+  // Return to main menu from game over screen
+  returnToMainMenu() {
+    try {
+      // Hide game over screen
+      const gameOverScreen = document.getElementById('gameOverScreen');
+      if (gameOverScreen) {
+        gameOverScreen.style.display = 'none';
+      }
+      
+      // Stop current background music
+      this.stopBackgroundMusic();
+
+      // Reset game state
+      this.gameState = 'ready';
+      this.spriteManager.clearNotes();
+      this.progressManager.reset();
+      this.effectManager.clearEffects();
+      this.difficultyManager.reset();
+      this.inputHandler.resetKeys();
+
+      // Reset monster position
+      const canvasDimensions = this.getCanvasDimensions();
+      const monster = this.spriteManager.getMonster();
+      if (monster) {
+        monster.x = canvasDimensions.width - monster.width - 20;
+        monster.resetSpeed();
+      }
+
+      // Hide progress bar
+      const progressBarContainer = document.querySelector('.progress-bar-container');
+      if (progressBarContainer) {
+        progressBarContainer.style.display = 'none';
+      }
+
+      // Show main menu
+      this.showMainMenu();
+
+      return true;
+    } catch (error) {
+      console.error('Error returning to main menu:', error);
       return false;
     }
   }
