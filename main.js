@@ -32,6 +32,9 @@ class GameManager {
     // Background music properties
     this.currentMusicTrack = null;
     
+    // Level background property
+    this.currentLevelBG = 'levelBG1';
+    
     // NotePath and HitBox properties
     this.notePathY = 0; // Y position of the note path (center of screen)
     this.notePathHeight = 100; // Height of the note path
@@ -110,7 +113,9 @@ class GameManager {
   // Load all sprite images and audio files
   async loadAssets() {
     const spriteAssets = [
-      { name: 'levelBG', path: 'LevelBG.png' },
+      { name: 'levelBG1', path: 'LevelBG.png' },
+      { name: 'levelBG2', path: 'LevelBG2.jpg' },
+      { name: 'levelBG3', path: 'LevelBG3.jpg' },
       { name: 'menuBG', path: 'MenuBG.jpg' },
       { name: 'menuTitle', path: 'Title.png' },
       { name: 'playButton', path: 'PlayButton.png' },
@@ -819,6 +824,9 @@ class GameManager {
       return false;
     }
 
+    // Randomize level background
+    this.randomizeLevelBackground();
+
     this.gameState = 'playing';
     this.gameStartTime = Date.now();
     this.monsterHasStarted = false;
@@ -1155,10 +1163,15 @@ class GameManager {
 
       // Reset sprites
       const canvasDimensions = this.getCanvasDimensions();
-      const player = this.spriteManager.getPlayer();
       const monster = this.spriteManager.getMonster();
 
       if (monster) {
+        // Randomize monster sprite
+        const monsterOptions = ['monster1', 'monster2', 'monster3'];
+        const randomMonsterKey = monsterOptions[Math.floor(Math.random() * monsterOptions.length)];
+        const newMonsterSprite = this.getSprite(randomMonsterKey);
+        monster.sprite = newMonsterSprite;
+        
         // Reset monster to original position (right side with padding)
         monster.x = canvasDimensions.width - monster.width - 20;
         monster.resetSpeed();
@@ -1206,7 +1219,7 @@ class GameManager {
   // Render the background image
   renderBackground() {
     try {
-      const levelBG = this.getSprite('levelBG');
+      const levelBG = this.getSprite(this.currentLevelBG);
       if (!levelBG) {
         console.warn('LevelBG sprite not found');
         return;
@@ -1223,6 +1236,12 @@ class GameManager {
     } catch (error) {
       console.error('Error rendering background:', error);
     }
+  }
+
+  // Randomize level background
+  randomizeLevelBackground() {
+    const bgOptions = ['levelBG1', 'levelBG2', 'levelBG3'];
+    this.currentLevelBG = bgOptions[Math.floor(Math.random() * bgOptions.length)];
   }
 
   // Render the NotePath background
