@@ -173,26 +173,40 @@ class GameManager {
   loadAudio(name, path) {
     return new Promise((resolve, reject) => {
       const audio = new Audio();
+      let resolved = false;
       
-      // Handle successful load - use loadedmetadata as fallback for large files
+      // Use loadeddata for faster loading - doesn't wait for full buffer
       const handleSuccess = () => {
+        if (resolved) return;
+        resolved = true;
         this.assets.audio[name] = audio;
         this.loadedAssets++;
-        // Remove event listeners to prevent duplicate calls
-        audio.removeEventListener('canplaythrough', handleSuccess);
-        audio.removeEventListener('loadedmetadata', handleSuccess);
         resolve();
       };
       
-      audio.addEventListener('canplaythrough', handleSuccess, { once: true });
-      audio.addEventListener('loadedmetadata', handleSuccess, { once: true });
+      // loadeddata fires when first frame is available - much faster than canplaythrough
+      audio.addEventListener('loadeddata', handleSuccess, { once: true });
+      
+      // Fallback timeout - resolve after 2 seconds even if not fully loaded
+      setTimeout(() => {
+        if (!resolved) {
+          resolved = true;
+          this.assets.audio[name] = audio;
+          this.loadedAssets++;
+          resolve();
+        }
+      }, 2000);
       
       audio.onerror = () => {
+        if (resolved) return;
+        resolved = true;
         const error = new Error(`Failed to load audio: ${path}`);
         this.assetLoadError = error;
         reject(error);
       };
       
+      // Preload metadata only - faster initial load
+      audio.preload = 'metadata';
       audio.src = path;
     });
   }
