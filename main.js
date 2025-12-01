@@ -20,7 +20,7 @@ class GameManager {
     // Note spawning properties
     this.lastNoteSpawnTime = 0;
     this.minSpawn = 300;  // 0.3 seconds minimum between spawns
-    this.maxSpawn = 1000; // 1 seconds maximum between spawns
+    this.maxSpawn = 700; // 0.7 seconds maximum between spawns
     this.nextSpawnInterval = 0; // Will be set randomly
     this.noteDirections = ['up', 'down', 'left', 'right'];
     
@@ -46,6 +46,10 @@ class GameManager {
     this.playButtonBounds = { x: 0, y: 0, width: 0, height: 0 };
     this.infoButtonBounds = { x: 0, y: 0, width: 0, height: 0 };
     this.isInfoVisible = false; // Toggle state for info text
+    
+    // Loading screen properties
+    this.isLoading = true;
+    this.loadingProgress = 0;
   }
 
   // Initialize the game and load all assets
@@ -61,6 +65,16 @@ class GameManager {
       if (!this.ctx) {
         throw new Error('Failed to get canvas 2D context');
       }
+
+      // Hide the top progress bar during loading
+      const progressBarContainer = document.querySelector('.progress-bar-container');
+      if (progressBarContainer) {
+        progressBarContainer.style.display = 'none';
+      }
+
+      // Start loading screen render loop
+      this.isLoading = true;
+      this.renderLoadingScreen();
 
       // Load all assets
       await this.loadAssets();
@@ -79,6 +93,9 @@ class GameManager {
 
       // Set up restart button handler
       this.setupRestartButton();
+
+      // Hide loading screen with smooth transition
+      this.isLoading = false;
 
       this.gameState = 'ready';
       return true;
@@ -216,6 +233,49 @@ class GameManager {
     // Set canvas background color
     this.ctx.fillStyle = '#1a1a1a';
     this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+  }
+
+  // Render loading screen
+  renderLoadingScreen() {
+    if (!this.isLoading) return;
+    
+    // Calculate loading progress
+    this.loadingProgress = this.totalAssets > 0 ? (this.loadedAssets / this.totalAssets) * 100 : 0;
+    
+    // Clear canvas with black background
+    this.ctx.fillStyle = '#000000';
+    this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+    
+    // Loading bar dimensions (centered)
+    const barWidth = 400;
+    const barHeight = 30;
+    const barX = (this.canvas.width - barWidth) / 2;
+    const barY = (this.canvas.height - barHeight) / 2;
+    
+    // Draw loading bar background (dark gray)
+    this.ctx.fillStyle = '#333333';
+    this.ctx.fillRect(barX, barY, barWidth, barHeight);
+    
+    // Draw loading bar fill (dark red)
+    const fillWidth = (this.loadingProgress / 100) * barWidth;
+    this.ctx.fillStyle = '#8B0000';
+    this.ctx.fillRect(barX, barY, fillWidth, barHeight);
+    
+    // Draw loading bar border
+    this.ctx.strokeStyle = '#555555';
+    this.ctx.lineWidth = 2;
+    this.ctx.strokeRect(barX, barY, barWidth, barHeight);
+    
+    // Draw loading percentage text below the bar
+    this.ctx.fillStyle = '#FFFFFF';
+    this.ctx.font = '20px Arial';
+    this.ctx.textAlign = 'center';
+    this.ctx.fillText(`Loading... ${Math.floor(this.loadingProgress)}%`, this.canvas.width / 2, barY + barHeight + 40);
+    
+    // Continue rendering loading screen
+    if (this.isLoading) {
+      requestAnimationFrame(() => this.renderLoadingScreen());
+    }
   }
 
   // Initialize player and monster sprites
