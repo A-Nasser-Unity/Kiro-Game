@@ -44,6 +44,8 @@ class GameManager {
     this.isInMenu = true; // Start in menu
     this.menuMusicPlaying = false;
     this.playButtonBounds = { x: 0, y: 0, width: 0, height: 0 };
+    this.infoButtonBounds = { x: 0, y: 0, width: 0, height: 0 };
+    this.isInfoVisible = false; // Toggle state for info text
   }
 
   // Initialize the game and load all assets
@@ -111,7 +113,9 @@ class GameManager {
       { name: 'win', path: 'Win.png' },
       { name: 'lose', path: 'Lose.png' },
       { name: 'notePath', path: 'NotePath.png' },
-      { name: 'hitBox', path: 'HitBox.png' }
+      { name: 'hitBox', path: 'HitBox.png' },
+      { name: 'infoButton', path: 'InfoButton.png' },
+      { name: 'infoText', path: 'InfoText.png' }
     ];
 
     const audioAssets = [
@@ -123,7 +127,8 @@ class GameManager {
       { name: 'track1', path: 'Track1.wav' },
       { name: 'track2', path: 'Track2.wav' },
       { name: 'track3', path: 'Track3.wav' },
-      { name: 'menuMusic', path: 'Menu.wav' }
+      { name: 'menuMusic', path: 'Menu.wav' },
+      { name: 'openInfo', path: 'Open.wav' }
     ];
 
     this.totalAssets = spriteAssets.length + audioAssets.length;
@@ -555,6 +560,20 @@ class GameManager {
       };
     }
     
+    // Set up info button bounds (bottom-right corner)
+    const infoButton = this.getSprite('infoButton');
+    if (infoButton) {
+      this.infoButtonBounds = {
+        x: this.canvas.width - 80,
+        y: this.canvas.height - 100,
+        width: 60,
+        height: 90
+      };
+    }
+    
+    // Reset info visibility when entering menu
+    this.isInfoVisible = false;
+    
     // Add click listener for play button and menu music
     this.canvas.addEventListener('click', this.handleMenuClick.bind(this));
     
@@ -578,8 +597,20 @@ class GameManager {
     const clickX = event.clientX - rect.left;
     const clickY = event.clientY - rect.top;
     
-    // Check if click is on play button
+    // Check if click is on info button
     if (
+      clickX >= this.infoButtonBounds.x &&
+      clickX <= this.infoButtonBounds.x + this.infoButtonBounds.width &&
+      clickY >= this.infoButtonBounds.y &&
+      clickY <= this.infoButtonBounds.y + this.infoButtonBounds.height
+    ) {
+      this.toggleInfoText();
+      return; // Don't check play button if info button was clicked
+    }
+    
+    // Check if click is on play button (only if info is not visible)
+    if (
+      !this.isInfoVisible &&
       clickX >= this.playButtonBounds.x &&
       clickX <= this.playButtonBounds.x + this.playButtonBounds.width &&
       clickY >= this.playButtonBounds.y &&
@@ -587,6 +618,13 @@ class GameManager {
     ) {
       this.startGameFromMenu();
     }
+  }
+
+  // Toggle info text visibility
+  toggleInfoText() {
+    this.isInfoVisible = !this.isInfoVisible;
+    // Play Open.wav sound effect
+    this.audioManager.play('openInfo');
   }
 
   // Start game from menu
@@ -683,6 +721,30 @@ class GameManager {
           this.playButtonBounds.width,
           this.playButtonBounds.height
         );
+      }
+      
+      // Draw info button at bottom-right corner
+      const infoButton = this.getSprite('infoButton');
+      if (infoButton) {
+        this.ctx.drawImage(
+          infoButton,
+          this.infoButtonBounds.x,
+          this.infoButtonBounds.y,
+          this.infoButtonBounds.width,
+          this.infoButtonBounds.height
+        );
+      }
+      
+      // Draw info text at center if visible
+      if (this.isInfoVisible) {
+        const infoText = this.getSprite('infoText');
+        if (infoText) {
+          const infoWidth = 750;
+          const infoHeight = 573;
+          const infoX = this.canvas.width / 2 - infoWidth / 2;
+          const infoY = this.canvas.height / 2 - infoHeight / 2;
+          this.ctx.drawImage(infoText, infoX, infoY, infoWidth, infoHeight);
+        }
       }
     } catch (error) {
       console.error('Error rendering menu:', error);
@@ -818,6 +880,9 @@ class GameManager {
     try {
       // Mark note as hit
       note.markAsHit();
+
+      // Immediately remove the note from the game
+      this.spriteManager.removeNote(note.id);
 
       // Determine progress amount based on hit type
       const progressAmount = hitType === 'perfect' ? 4 : 2;
