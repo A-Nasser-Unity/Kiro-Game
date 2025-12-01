@@ -81,7 +81,6 @@ class GameManager {
       this.setupRestartButton();
 
       this.gameState = 'ready';
-      console.log('Game initialized successfully');
       return true;
     } catch (error) {
       this.assetLoadError = error;
@@ -269,11 +268,6 @@ class GameManager {
         this.hitBoxY = this.notePathY; // On the note path
       }
       
-      console.log(`Sprites initialized successfully - Monster: ${randomMonsterKey}, Speed: ${reducedSpeed}`);
-      console.log(`Player: ${playerWidth}x${playerHeight} at (${playerX}, ${playerY})`);
-      console.log(`Monster: ${monsterWidth}x${monsterHeight} at (${monsterX}, ${monsterY})`);
-      console.log(`NotePath: Y=${this.notePathY}, Height=${this.notePathHeight}`);
-      console.log(`HitBox: (${this.hitBoxX}, ${this.hitBoxY}) ${this.hitBoxWidth}x${this.hitBoxHeight}`);
       return true;
     } catch (error) {
       console.error('Error initializing sprites:', error);
@@ -297,8 +291,6 @@ class GameManager {
         return false;
       }
       
-      console.log(`Audio element found for ${randomTrack}, readyState: ${audio.readyState}`);
-      
       // Set up the audio to loop
       audio.loop = true;
       audio.volume = 0.5; // Set volume to 50% to not overpower sound effects
@@ -314,14 +306,11 @@ class GameManager {
       if (playPromise !== undefined) {
         playPromise
           .then(() => {
-            console.log(`✓ Successfully playing background music: ${randomTrack}`);
+            // Music started successfully
           })
           .catch(error => {
-            console.warn(`⚠ Background music autoplay blocked (${error.name}): ${error.message}`);
-            console.log('Music will play after user interaction');
+            console.warn(`Background music autoplay blocked: ${error.message}`);
           });
-      } else {
-        console.log(`Background music track selected: ${randomTrack} (older browser)`);
       }
       
       return true;
@@ -654,9 +643,7 @@ class GameManager {
         if (playPromise !== undefined) {
           playPromise.then(() => {
             this.menuMusicPlaying = true;
-            console.log('Menu music started playing');
           }).catch(error => {
-            console.warn('Menu music autoplay blocked - click anywhere to start music:', error.message);
             this.menuMusicPlaying = false;
           });
         }
@@ -906,9 +893,6 @@ class GameManager {
       };
       this.effectManager.createEffect(hitType, effectPosition, this.assets.sprites);
 
-      // Log hit for debugging
-      console.log(`${hitType.toUpperCase()} hit! Progress: +${progressAmount}%`);
-
       return true;
     } catch (error) {
       console.error('Error handling hit:', error);
@@ -970,7 +954,6 @@ class GameManager {
         monster.increaseSpeed(speedIncrement);
       }
 
-      console.log('Note missed! Progress: -5%');
       return true;
     } catch (error) {
       console.error('Error handling miss:', error);
@@ -1019,7 +1002,6 @@ class GameManager {
       // Display end game screen
       this.displayGameOverScreen(result);
 
-      console.log(`Game ${result}!`);
       return true;
     } catch (error) {
       console.error('Error ending game:', error);
@@ -1107,7 +1089,6 @@ class GameManager {
       // Restart the game
       this.start();
 
-      console.log('Game restarted');
       return true;
     } catch (error) {
       console.error('Error restarting game:', error);
@@ -1246,7 +1227,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   const initialized = await gameManager.init();
 
   if (initialized) {
-    console.log('Game is ready to start');
     // Store game manager globally for access by other modules
     window.gameManager = gameManager;
     
@@ -2074,7 +2054,6 @@ class AudioManager {
       // Set initial volume for all audio elements
       this.setVolume(this.volume);
 
-      console.log('Audio Manager initialized successfully');
       return true;
     } catch (error) {
       console.error('Audio Manager initialization failed:', error);
