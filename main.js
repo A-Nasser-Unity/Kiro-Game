@@ -1083,6 +1083,9 @@ class GameManager {
       // Stop current background music
       this.stopBackgroundMusic();
 
+      // Reset game state to ready so start() will work
+      this.gameState = 'ready';
+
       // Reset all game state
       this.spriteManager.clearNotes();
       this.progressManager.reset();
@@ -1096,7 +1099,8 @@ class GameManager {
       const monster = this.spriteManager.getMonster();
 
       if (monster) {
-        monster.x = canvasDimensions.width - 100;
+        // Reset monster to original position (right side with padding)
+        monster.x = canvasDimensions.width - monster.width - 20;
         monster.resetSpeed();
       }
 
