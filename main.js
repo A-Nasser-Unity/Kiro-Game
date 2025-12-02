@@ -57,6 +57,23 @@ class GameManager {
     this.titleScaleMin = 1.0;   // Minimum scale
     this.titleScaleMax = 1.2;  // Maximum scale (8% larger)
     
+    // Button idle shake properties
+    this.buttonShakeDurationMin = 200;  // Min shake duration in ms (0.2 seconds)
+    this.buttonShakeDurationMax = 400;  // Max shake duration in ms (0.4 seconds)
+    this.buttonShakeStrength = 4;       // Shake intensity in pixels
+    this.buttonShakeMinInterval = 3000; // Min time between shakes (3 seconds)
+    this.buttonShakeMaxInterval = 7000; // Max time between shakes (7 seconds)
+    
+    // Play button shake state
+    this.playButtonShakeTimer = 0;
+    this.playButtonShakeOffset = { x: 0, y: 0 };
+    this.playButtonNextShake = this.getRandomShakeInterval();
+    
+    // Info button shake state
+    this.infoButtonShakeTimer = 0;
+    this.infoButtonShakeOffset = { x: 0, y: 0 };
+    this.infoButtonNextShake = this.getRandomShakeInterval() + 1500; // Offset start
+    
     // Loading screen properties
     this.isLoading = true;
     this.loadingProgress = 0;
@@ -777,8 +794,56 @@ class GameManager {
   menuLoop = () => {
     if (!this.isInMenu) return;
     
+    // Update button shake animations
+    this.updateButtonShake();
+    
     this.renderMenu();
     requestAnimationFrame(this.menuLoop);
+  }
+
+  // Get random interval for button shake
+  getRandomShakeInterval() {
+    return this.buttonShakeMinInterval + Math.random() * (this.buttonShakeMaxInterval - this.buttonShakeMinInterval);
+  }
+
+  // Update button shake animations
+  // Get random shake duration
+  getRandomShakeDuration() {
+    return this.buttonShakeDurationMin + Math.random() * (this.buttonShakeDurationMax - this.buttonShakeDurationMin);
+  }
+
+  updateButtonShake() {
+    const deltaTime = 16; // Approximate 60fps
+    
+    // Update play button shake
+    this.playButtonNextShake -= deltaTime;
+    if (this.playButtonNextShake <= 0) {
+      this.playButtonShakeTimer = this.getRandomShakeDuration();
+      this.playButtonNextShake = this.getRandomShakeInterval();
+    }
+    if (this.playButtonShakeTimer > 0) {
+      this.playButtonShakeTimer -= deltaTime;
+      this.playButtonShakeOffset.x = (Math.random() - 0.5) * this.buttonShakeStrength * 2;
+      this.playButtonShakeOffset.y = (Math.random() - 0.5) * this.buttonShakeStrength * 2;
+    } else {
+      this.playButtonShakeOffset.x = 0;
+      this.playButtonShakeOffset.y = 0;
+    }
+    
+    // Update info button shake
+    this.infoButtonNextShake -= deltaTime;
+    if (this.infoButtonNextShake <= 0) {
+      this.infoButtonShakeTimer = this.getRandomShakeDuration();
+      this.infoButtonNextShake = this.getRandomShakeInterval();
+    }
+    if (this.infoButtonShakeTimer > 0) {
+      this.infoButtonShakeTimer -= deltaTime;
+      this.infoButtonShakeOffset.x = (Math.random() - 0.5) * this.buttonShakeStrength * 2;
+      this.infoButtonShakeOffset.y = (Math.random() - 0.5) * this.buttonShakeStrength * 2;
+    } else {
+      this.infoButtonShakeOffset.x = 0;
+      this.infoButtonShakeOffset.y = 0;
+    }
   }
 
   // Render main menu
@@ -812,25 +877,25 @@ class GameManager {
         this.ctx.drawImage(title, titleX, titleY, titleWidth, titleHeight);
       }
       
-      // Draw play button at bottom center
+      // Draw play button at bottom center with shake
       const playButton = this.getSprite('playButton');
       if (playButton) {
         this.ctx.drawImage(
           playButton,
-          this.playButtonBounds.x,
-          this.playButtonBounds.y,
+          this.playButtonBounds.x + this.playButtonShakeOffset.x,
+          this.playButtonBounds.y + this.playButtonShakeOffset.y,
           this.playButtonBounds.width,
           this.playButtonBounds.height
         );
       }
       
-      // Draw info button at bottom-right corner
+      // Draw info button at bottom-right corner with shake
       const infoButton = this.getSprite('infoButton');
       if (infoButton) {
         this.ctx.drawImage(
           infoButton,
-          this.infoButtonBounds.x,
-          this.infoButtonBounds.y,
+          this.infoButtonBounds.x + this.infoButtonShakeOffset.x,
+          this.infoButtonBounds.y + this.infoButtonShakeOffset.y,
           this.infoButtonBounds.width,
           this.infoButtonBounds.height
         );
