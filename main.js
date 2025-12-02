@@ -51,6 +51,12 @@ class GameManager {
     this.isInfoVisible = false; // Toggle state for info text
     this.menuClickHandlerBound = null; // Store bound handler to prevent duplicates
     
+    // Title scale animation properties
+    this.titleScaleTimer = 0;
+    this.titleScaleSpeed = 0.05; // Speed of scale animation (cycles per second)
+    this.titleScaleMin = 1.0;   // Minimum scale
+    this.titleScaleMax = 1.2;  // Maximum scale (8% larger)
+    
     // Loading screen properties
     this.isLoading = true;
     this.loadingProgress = 0;
@@ -787,13 +793,22 @@ class GameManager {
         this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
       }
       
-      // Draw title at top center
+      // Draw title at top center with scale animation
       const title = this.getSprite('menuTitle');
       if (title) {
-        const titleWidth = 300;
-        const titleHeight = 151;
+        // Update scale timer
+        this.titleScaleTimer += 0.016; // Approximate 60fps delta
+        
+        // Calculate current scale using sine wave for smooth loop
+        const scaleRange = this.titleScaleMax - this.titleScaleMin;
+        const currentScale = this.titleScaleMin + scaleRange * (0.5 + 0.5 * Math.sin(this.titleScaleTimer * this.titleScaleSpeed * Math.PI * 2));
+        
+        const baseWidth = 300;
+        const baseHeight = 151;
+        const titleWidth = baseWidth * currentScale;
+        const titleHeight = baseHeight * currentScale;
         const titleX = this.canvas.width / 2 - titleWidth / 2;
-        const titleY = 50;
+        const titleY = 50 - (titleHeight - baseHeight) / 2; // Keep centered vertically
         this.ctx.drawImage(title, titleX, titleY, titleWidth, titleHeight);
       }
       
@@ -1715,36 +1730,16 @@ class Note {
     this.createdAt = Date.now();
     this.hit = false;
     this.id = Math.random(); // Unique identifier for this note
-    
-    // Trail effect properties
-    this.trailPositions = [];
-    this.maxTrailLength = 5;
   }
 
   // Update note position (move from right to left)
   update(deltaTime) {
-    // Store previous position for trail
-    this.trailPositions.unshift({ x: this.x, y: this.y });
-    if (this.trailPositions.length > this.maxTrailLength) {
-      this.trailPositions.pop();
-    }
-    
     this.x -= this.speed * deltaTime;
   }
 
-  // Render the note sprite with trail
+  // Render the note sprite
   render(ctx) {
     if (this.sprite) {
-      // Draw trail (fading copies behind the note)
-      for (let i = this.trailPositions.length - 1; i >= 0; i--) {
-        const pos = this.trailPositions[i];
-        const alpha = 0.25 * (1 - i / this.maxTrailLength);
-        ctx.globalAlpha = alpha;
-        ctx.drawImage(this.sprite, pos.x, pos.y, this.width, this.height);
-      }
-      
-      // Draw main note
-      ctx.globalAlpha = 1.0;
       ctx.drawImage(this.sprite, this.x, this.y, this.width, this.height);
     }
   }
