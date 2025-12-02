@@ -1110,6 +1110,11 @@ class GameManager {
       // Stop spawning notes
       this.lastNoteSpawnTime = Date.now() + 999999; // Prevent further spawning
       
+      // Hide monster when player wins
+      if (result === 'won') {
+        this.spriteManager.hideMonster();
+      }
+      
       // Stop background music
       this.stopBackgroundMusic();
 
@@ -1207,12 +1212,13 @@ class GameManager {
       this.isInDangerZone = false;
       this.heartbeatPlayed = false;
 
-      // Reset monster position
+      // Reset monster position and visibility
       const canvasDimensions = this.getCanvasDimensions();
       const monster = this.spriteManager.getMonster();
       if (monster) {
         monster.x = canvasDimensions.width - monster.width - 20;
         monster.resetSpeed();
+        monster.visible = true;
       }
 
       // Hide progress bar
@@ -1271,6 +1277,9 @@ class GameManager {
         // Reset monster to original position (right side with padding)
         monster.x = canvasDimensions.width - monster.width - 20;
         monster.resetSpeed();
+        
+        // Make monster visible again
+        monster.visible = true;
       }
 
       // Restart the game
@@ -1613,6 +1622,7 @@ class Monster {
     this.currentSpeed = baseSpeed;
     this.width = width;
     this.height = height;
+    this.visible = true;
   }
 
   // Update monster position (move toward player)
@@ -1647,7 +1657,7 @@ class Monster {
 
   // Render the monster sprite
   render(ctx) {
-    if (this.sprite) {
+    if (this.sprite && this.visible) {
       ctx.drawImage(this.sprite, this.x, this.y, this.width, this.height);
     }
   }
@@ -1970,6 +1980,20 @@ class SpriteManager {
   // Get the monster sprite
   getMonster() {
     return this.monster;
+  }
+
+  // Hide monster (set visibility flag)
+  hideMonster() {
+    if (this.monster) {
+      this.monster.visible = false;
+    }
+  }
+
+  // Show monster (set visibility flag)
+  showMonster() {
+    if (this.monster) {
+      this.monster.visible = true;
+    }
   }
 
   // Add a note to the collection
