@@ -54,6 +54,20 @@ class GameManager {
     // Loading screen properties
     this.isLoading = true;
     this.loadingProgress = 0;
+    
+    // Screen shake properties
+    this.shakeIntensity = 0;
+    this.shakeDuration = 0;
+    this.shakeTimer = 0;
+    this.smallShakeIntensity = 2;   // Miss note shake
+    this.smallShakeDuration = 100;  // 0.1 seconds
+    this.mediumShakeIntensity = 10; // Monster collision shake
+    this.mediumShakeDuration = 1500; // 1.5 seconds
+    
+    // Monster danger zone properties
+    this.dangerZoneThreshold = 0.35; // Monster within 35% of canvas width from player
+    this.isInDangerZone = false;
+    this.heartbeatPlayed = false; // Track if heartbeat was played this danger zone entry
   }
 
   // Initialize the game and load all assets
@@ -150,7 +164,8 @@ class GameManager {
       { name: 'track2', path: 'Track2.wav' },
       { name: 'track3', path: 'Track3.wav' },
       { name: 'menuMusic', path: 'Menu.wav' },
-      { name: 'openInfo', path: 'Open.wav' }
+      { name: 'openInfo', path: 'Open.wav' },
+      { name: 'heartbeat', path: 'HeartBeat.mp3' }
     ];
 
     this.totalAssets = spriteAssets.length + audioAssets.length;
@@ -868,14 +883,25 @@ class GameManager {
       // Update effects
       this.effectManager.update(deltaTime);
 
+      // Update screen shake timer
+      this.updateShake(deltaTime);
+
       // Remove off-screen notes
       this.spriteManager.removeOffScreenNotes(this.canvas.width);
 
       // Check for missed notes
       this.checkMissedNotes();
 
+      // Check monster danger zone
+      this.checkDangerZone();
+
       // Check win/lose conditions
       this.checkGameConditions();
+    }
+
+    // Always update shake timer (even when game ends)
+    if (this.gameState === 'won' || this.gameState === 'lost') {
+      this.updateShake(deltaTime);
     }
 
     // Render the game
@@ -1022,6 +1048,9 @@ class GameManager {
       // Play miss audio
       this.audioManager.play('miss');
 
+      // Trigger small screen shake on miss
+      this.triggerSmallShake();
+
       // Create miss visual effect at center of canvas (X-axis) and Y=60
       const effectPosition = {
         x: this.canvas.width / 2,
@@ -1062,6 +1091,8 @@ class GameManager {
       const monster = this.spriteManager.getMonster();
 
       if (player && monster && monster.hasReachedPlayer(player.x)) {
+        // Trigger medium screen shake on monster collision
+        this.triggerMediumShake();
         this.endGame('lost');
         return;
       }
@@ -1171,6 +1202,10 @@ class GameManager {
       this.effectManager.clearEffects();
       this.difficultyManager.reset();
       this.inputHandler.resetKeys();
+      
+      // Reset danger zone state
+      this.isInDangerZone = false;
+      this.heartbeatPlayed = false;
 
       // Reset monster position
       const canvasDimensions = this.getCanvasDimensions();
@@ -1217,6 +1252,10 @@ class GameManager {
       this.effectManager.clearEffects();
       this.difficultyManager.reset();
       this.inputHandler.resetKeys();
+      
+      // Reset danger zone state
+      this.isInDangerZone = false;
+      this.heartbeatPlayed = false;
 
       // Reset sprites
       const canvasDimensions = this.getCanvasDimensions();
@@ -1247,6 +1286,14 @@ class GameManager {
   // Render the game
   render() {
     try {
+      // Apply screen shake if active
+      this.ctx.save();
+      if (this.shakeTimer > 0) {
+        const shakeX = (Math.random() - 0.5) * this.shakeIntensity * 2;
+        const shakeY = (Math.random() - 0.5) * this.shakeIntensity * 2;
+        this.ctx.translate(shakeX, shakeY);
+      }
+
       // Clear canvas
       this.ctx.fillStyle = '#1a1a1a';
       this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
@@ -1266,11 +1313,106 @@ class GameManager {
       // Render all effects
       this.effectManager.render(this.ctx);
 
+      // Render danger zone effects (red glow and dim)
+      this.renderDangerEffects();
+
       // Optional: Draw debug info (hit box and miss collider)
       // this.drawDebugInfo();
+      
+      // Restore canvas state after shake
+      this.ctx.restore();
     } catch (error) {
       console.error('Error rendering game:', error);
     }
+  }
+
+  // Update screen shake timer
+  updateShake(deltaTime) {
+    if (this.shakeTimer > 0) {
+      this.shakeTimer -= deltaTime * 1000; // Convert to ms
+      if (this.shakeTimer <= 0) {
+        this.shakeTimer = 0;
+        this.shakeIntensity = 0;
+      }
+    }
+  }
+
+  // Trigger small screen shake (for miss)
+  triggerSmallShake() {
+    this.shakeIntensity = this.smallShakeIntensity;
+    this.shakeTimer = this.smallShakeDuration;
+  }
+
+  // Trigger medium screen shake (for monster collision)
+  triggerMediumShake() {
+    this.shakeIntensity = this.mediumShakeIntensity;
+    this.shakeTimer = this.mediumShakeDuration;
+  }
+
+  // Check if monster is in danger zone
+  checkDangerZone() {
+    const player = this.spriteManager.getPlayer();
+    const monster = this.spriteManager.getMonster();
+    
+    if (!player || !monster) return;
+    
+    // Calculate danger zone threshold (monster within X% of canvas from player)
+    const dangerDistance = this.canvas.width * this.dangerZoneThreshold;
+    const monsterDistanceFromPlayer = monster.x - player.x;
+    
+    const wasInDangerZone = this.isInDangerZone;
+    this.isInDangerZone = monsterDistanceFromPlayer <= dangerDistance && monsterDistanceFromPlayer > 0;
+    
+    // Play heartbeat once when entering danger zone
+    if (this.isInDangerZone && !wasInDangerZone && !this.heartbeatPlayed) {
+      this.audioManager.play('heartbeat');
+      this.heartbeatPlayed = true;
+    }
+    
+    // Reset heartbeat flag when leaving danger zone
+    if (!this.isInDangerZone && wasInDangerZone) {
+      this.heartbeatPlayed = false;
+    }
+  }
+
+  // Render danger zone effects (red glow and screen dim)
+  renderDangerEffects() {
+    if (!this.isInDangerZone) return;
+    
+    // Screen dimming effect
+    this.ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
+    this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+    
+    // Red edge glow effect
+    const glowSize = 60;
+    const gradient = this.ctx.createLinearGradient(0, 0, glowSize, 0);
+    gradient.addColorStop(0, 'rgba(139, 0, 0, 0.6)');
+    gradient.addColorStop(1, 'rgba(139, 0, 0, 0)');
+    
+    // Left edge glow
+    this.ctx.fillStyle = gradient;
+    this.ctx.fillRect(0, 0, glowSize, this.canvas.height);
+    
+    // Right edge glow
+    const gradientRight = this.ctx.createLinearGradient(this.canvas.width, 0, this.canvas.width - glowSize, 0);
+    gradientRight.addColorStop(0, 'rgba(139, 0, 0, 0.6)');
+    gradientRight.addColorStop(1, 'rgba(139, 0, 0, 0)');
+    this.ctx.fillStyle = gradientRight;
+    this.ctx.fillRect(this.canvas.width - glowSize, 0, glowSize, this.canvas.height);
+    
+    // Top edge glow
+    const gradientTop = this.ctx.createLinearGradient(0, 0, 0, glowSize);
+    gradientTop.addColorStop(0, 'rgba(139, 0, 0, 0.6)');
+    gradientTop.addColorStop(1, 'rgba(139, 0, 0, 0)');
+    this.ctx.fillStyle = gradientTop;
+    this.ctx.fillRect(0, 0, this.canvas.width, glowSize);
+    
+    // Bottom edge glow
+    const gradientBottom = this.ctx.createLinearGradient(0, this.canvas.height, 0, this.canvas.height - glowSize);
+    gradientBottom.addColorStop(0, 'rgba(139, 0, 0, 0.6)');
+    gradientBottom.addColorStop(1, 'rgba(139, 0, 0, 0)');
+    this.ctx.fillStyle = gradientBottom;
+    this.ctx.fillRect(0, this.canvas.height - glowSize, this.canvas.width, glowSize);
   }
 
   // Render the background image
