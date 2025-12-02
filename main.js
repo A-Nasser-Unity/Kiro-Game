@@ -1556,6 +1556,13 @@ class Player {
     this.hitAnimationTimer = 0;
     this.hitAnimationDuration = 200; // 200ms (0.2 seconds)
     
+    // Bounce effect properties
+    this.bounceScale = 1.0;
+    this.isBouncing = false;
+    this.bounceTimer = 0;
+    this.bounceDuration = 150; // 150ms bounce
+    this.bounceIntensity = 0.10; // 10% scale increase
+    
     // Hit box properties - area where notes must be hit (scaled proportionally)
     // Hit box is positioned above the player sprite
     const scale = width / 80; // Calculate scale factor relative to default 80px
@@ -1570,10 +1577,13 @@ class Player {
     this.hitSprite = hitSprite;
   }
 
-  // Trigger hit animation
+  // Trigger hit animation and bounce
   playHitAnimation() {
     this.isPlayingHitAnimation = true;
     this.hitAnimationTimer = this.hitAnimationDuration;
+    // Also trigger bounce
+    this.isBouncing = true;
+    this.bounceTimer = this.bounceDuration;
   }
 
   // Update animation state
@@ -1585,6 +1595,19 @@ class Player {
         this.hitAnimationTimer = 0;
       }
     }
+    
+    // Update bounce effect
+    if (this.isBouncing) {
+      this.bounceTimer -= deltaTime * 1000;
+      // Calculate bounce scale (ease out)
+      const progress = 1 - (this.bounceTimer / this.bounceDuration);
+      this.bounceScale = 1 + this.bounceIntensity * Math.sin(progress * Math.PI);
+      
+      if (this.bounceTimer <= 0) {
+        this.isBouncing = false;
+        this.bounceScale = 1.0;
+      }
+    }
   }
 
   // Render the player sprite
@@ -1592,7 +1615,13 @@ class Player {
     // Show hit sprite during animation, otherwise show default sprite
     const currentSprite = (this.isPlayingHitAnimation && this.hitSprite) ? this.hitSprite : this.sprite;
     if (currentSprite) {
-      ctx.drawImage(currentSprite, this.x, this.y, this.width, this.height);
+      // Apply bounce scale
+      const scaledWidth = this.width * this.bounceScale;
+      const scaledHeight = this.height * this.bounceScale;
+      // Center the scaled sprite
+      const offsetX = (scaledWidth - this.width) / 2;
+      const offsetY = (scaledHeight - this.height) / 2;
+      ctx.drawImage(currentSprite, this.x - offsetX, this.y - offsetY, scaledWidth, scaledHeight);
     }
   }
 
@@ -1686,16 +1715,36 @@ class Note {
     this.createdAt = Date.now();
     this.hit = false;
     this.id = Math.random(); // Unique identifier for this note
+    
+    // Trail effect properties
+    this.trailPositions = [];
+    this.maxTrailLength = 5;
   }
 
   // Update note position (move from right to left)
   update(deltaTime) {
+    // Store previous position for trail
+    this.trailPositions.unshift({ x: this.x, y: this.y });
+    if (this.trailPositions.length > this.maxTrailLength) {
+      this.trailPositions.pop();
+    }
+    
     this.x -= this.speed * deltaTime;
   }
 
-  // Render the note sprite
+  // Render the note sprite with trail
   render(ctx) {
     if (this.sprite) {
+      // Draw trail (fading copies behind the note)
+      for (let i = this.trailPositions.length - 1; i >= 0; i--) {
+        const pos = this.trailPositions[i];
+        const alpha = 0.25 * (1 - i / this.maxTrailLength);
+        ctx.globalAlpha = alpha;
+        ctx.drawImage(this.sprite, pos.x, pos.y, this.width, this.height);
+      }
+      
+      // Draw main note
+      ctx.globalAlpha = 1.0;
       ctx.drawImage(this.sprite, this.x, this.y, this.width, this.height);
     }
   }
@@ -2178,6 +2227,7 @@ class EffectManager {
   constructor() {
     this.effects = [];
     this.effectDuration = 0.5; // Duration in seconds for effect fade-out
+    this.particles = []; // Particle system for Perfect hits
   }
 
   // Create a visual effect at a specific position
@@ -2230,6 +2280,30 @@ class EffectManager {
 
     // Add effect to active effects list
     this.effects.push(effect);
+    
+    // Spawn particles for Perfect hits
+    if (type === 'perfect') {
+      this.spawnParticles(position.x, position.y, 12);
+    }
+  }
+
+  // Spawn particles at position
+  spawnParticles(x, y, count) {
+    const colors = ['#FFD700', '#FFA500', '#FF6347', '#FFFF00', '#00FF00'];
+    for (let i = 0; i < count; i++) {
+      const angle = (Math.PI * 2 * i) / count + Math.random() * 0.5;
+      const speed = 100 + Math.random() * 150;
+      this.particles.push({
+        x: x,
+        y: y,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed,
+        size: 4 + Math.random() * 6,
+        color: colors[Math.floor(Math.random() * colors.length)],
+        life: 1.0,
+        decay: 1.5 + Math.random() * 0.5
+      });
+    }
   }
 
   // Update all active effects
@@ -2245,10 +2319,20 @@ class EffectManager {
       // Keep effect if still visible, remove if fully faded
       return effect.opacity > 0;
     });
+    
+    // Update particles
+    this.particles = this.particles.filter(p => {
+      p.x += p.vx * deltaTime;
+      p.y += p.vy * deltaTime;
+      p.vy += 200 * deltaTime; // Gravity
+      p.life -= p.decay * deltaTime;
+      return p.life > 0;
+    });
   }
 
   // Render all active effects on canvas
   render(ctx) {
+    // Render sprite effects
     this.effects.forEach(effect => {
       // Save canvas state
       ctx.save();
@@ -2270,6 +2354,17 @@ class EffectManager {
       // Restore canvas state
       ctx.restore();
     });
+    
+    // Render particles
+    this.particles.forEach(p => {
+      ctx.save();
+      ctx.globalAlpha = p.life;
+      ctx.fillStyle = p.color;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.size * p.life, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    });
   }
 
   // Get all active effects
@@ -2285,6 +2380,7 @@ class EffectManager {
   // Clear all effects
   clearEffects() {
     this.effects = [];
+    this.particles = [];
   }
 
   // Set effect duration (in seconds)
