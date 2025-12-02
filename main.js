@@ -24,6 +24,13 @@ class GameManager {
     this.nextSpawnInterval = 0; // Will be set randomly
     this.noteDirections = ['up', 'down', 'left', 'right'];
     
+    // Progressive note speed properties
+    this.baseNoteSpeed = 600;        // Starting note speed
+    this.currentNoteSpeed = 600;     // Current note speed (increases over time)
+    this.maxNoteSpeed = 900;         // Maximum note speed cap
+    this.speedIncreaseRate = 5;      // Speed increase per second
+    this.lastSpeedUpdateTime = 0;    // Track time for speed updates
+    
     // Monster delay properties
     this.monsterStartDelay = 3000; // 3 seconds in milliseconds
     this.gameStartTime = 0;
@@ -570,8 +577,8 @@ class GameManager {
         return false;
       }
       
-      // Get note speed from difficulty manager
-      const noteSpeed = this.difficultyManager.getNoteSpeed();
+      // Use current progressive note speed
+      const noteSpeed = this.currentNoteSpeed;
       
       // Determine note size based on direction
       let noteWidth, noteHeight;
@@ -643,6 +650,23 @@ class GameManager {
   resetNoteSpawning() {
     this.lastNoteSpawnTime = Date.now();
     this.nextSpawnInterval = this.getRandomSpawnInterval();
+  }
+
+  // Update progressive note speed
+  updateNoteSpeed(deltaTime) {
+    // Gradually increase note speed over time
+    if (this.currentNoteSpeed < this.maxNoteSpeed) {
+      this.currentNoteSpeed += this.speedIncreaseRate * deltaTime;
+      // Cap at maximum speed
+      if (this.currentNoteSpeed > this.maxNoteSpeed) {
+        this.currentNoteSpeed = this.maxNoteSpeed;
+      }
+    }
+  }
+
+  // Reset note speed to base value
+  resetNoteSpeed() {
+    this.currentNoteSpeed = this.baseNoteSpeed;
   }
 
   // Show main menu
@@ -927,6 +951,9 @@ class GameManager {
     // Randomize level background
     this.randomizeLevelBackground();
 
+    // Reset note speed to base value
+    this.resetNoteSpeed();
+
     this.gameState = 'playing';
     this.gameStartTime = Date.now();
     this.monsterHasStarted = false;
@@ -953,6 +980,9 @@ class GameManager {
     if (this.gameState === 'playing') {
       // Update note spawning
       this.updateNoteSpawning();
+
+      // Update progressive note speed
+      this.updateNoteSpeed(deltaTime);
 
       // Update all sprites (pass monsterHasStarted flag)
       this.spriteManager.update(deltaTime, this.monsterHasStarted);
@@ -1065,7 +1095,7 @@ class GameManager {
       this.spriteManager.removeNote(note.id);
 
       // Determine progress amount based on hit type
-      const progressAmount = hitType === 'perfect' ? 4 : 2;
+      const progressAmount = hitType === 'perfect' ? 3 : 2;
 
       // Update progress bar
       this.progressManager.addProgress(progressAmount);
