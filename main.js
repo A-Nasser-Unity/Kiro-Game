@@ -20,7 +20,7 @@ class GameManager {
     // Note spawning properties
     this.lastNoteSpawnTime = 0;
     this.minSpawn = 300;  // 0.3 seconds minimum between spawns
-    this.maxSpawn = 700; // 0.7 seconds maximum between spawns
+    this.maxSpawn = 600; // 0.6 seconds maximum between spawns
     this.nextSpawnInterval = 0; // Will be set randomly
     this.noteDirections = ['up', 'down', 'left', 'right'];
     
@@ -63,6 +63,13 @@ class GameManager {
     this.titleScaleSpeed = 0.05; // Speed of scale animation (cycles per second)
     this.titleScaleMin = 1.0;   // Minimum scale
     this.titleScaleMax = 1.2;  // Maximum scale (8% larger)
+    
+    // Menu background distortion properties
+    this.bgDistortionTimer = 0;
+    this.bgDistortionSpeed = 0.4;      // Speed of distortion animation
+    this.bgDistortionIntensity = 4;    // Wave amplitude in pixels
+    this.bgDistortionFrequency = 0.01; // Wave frequency (lower = wider waves)
+    this.bgDistortionSlices = 20;      // Number of horizontal slices for effect
     
     // Button idle shake properties
     this.buttonShakeDurationMin = 200;  // Min shake duration in ms (0.2 seconds)
@@ -870,13 +877,48 @@ class GameManager {
     }
   }
 
+  // Render distorted background for horror effect
+  renderDistortedBackground(bgImage) {
+    const sliceHeight = this.canvas.height / this.bgDistortionSlices;
+    
+    for (let i = 0; i < this.bgDistortionSlices; i++) {
+      const y = i * sliceHeight;
+      
+      // Calculate wave offset for this slice
+      const waveOffset = Math.sin(
+        this.bgDistortionTimer * this.bgDistortionSpeed + 
+        i * this.bgDistortionFrequency * 100
+      ) * this.bgDistortionIntensity;
+      
+      // Add secondary slower wave for more organic feel
+      const secondaryWave = Math.sin(
+        this.bgDistortionTimer * this.bgDistortionSpeed * 0.5 + 
+        i * this.bgDistortionFrequency * 50
+      ) * (this.bgDistortionIntensity * 0.5);
+      
+      const totalOffset = waveOffset + secondaryWave;
+      
+      // Draw slice with horizontal offset
+      this.ctx.drawImage(
+        bgImage,
+        0, i * (bgImage.height / this.bgDistortionSlices),  // Source position
+        bgImage.width, bgImage.height / this.bgDistortionSlices,  // Source size
+        totalOffset, y,  // Destination position (with wave offset)
+        this.canvas.width, sliceHeight + 1  // Destination size (+1 to prevent gaps)
+      );
+    }
+  }
+
   // Render main menu
   renderMenu() {
     try {
-      // Draw menu background
+      // Update distortion timer
+      this.bgDistortionTimer += 0.016;
+      
+      // Draw menu background with horror distortion effect
       const menuBG = this.getSprite('menuBG');
       if (menuBG) {
-        this.ctx.drawImage(menuBG, 0, 0, this.canvas.width, this.canvas.height);
+        this.renderDistortedBackground(menuBG);
       } else {
         this.ctx.fillStyle = '#1a1a1a';
         this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
